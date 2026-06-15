@@ -23,7 +23,13 @@ interface LineChartProps {
 
 export function LineChart({ component, selected, onSelect, period = 'weekly', dataConfig }: LineChartProps) {
   const dataSourceId = dataConfig?.dataSource || 'ds-sales';
-  const data = useMemo(() => generateChartData(dataSourceId, period), [dataSourceId, period]);
+  const filters = dataConfig?.filters || [];
+  const dateRange = dataConfig?.dateRange;
+
+  const data = useMemo(
+    () => generateChartData(dataSourceId, period, filters, dateRange),
+    [dataSourceId, period, filters, dateRange]
+  );
   const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   const yAxisKeys = useMemo(() => {

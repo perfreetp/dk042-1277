@@ -1,4 +1,6 @@
 import type { ReportTemplate, ReportComponent } from '../types';
+import { getFieldsForDataSource } from './mockData';
+import { getDateRange } from '../utils/dateUtils';
 
 const generateId = () => Math.random().toString(36).substring(2, 11);
 
@@ -102,6 +104,24 @@ export const systemTemplates: ReportTemplate[] = [
     isSystem: true,
     useCount: 1256,
     createdAt: '2026-01-15',
+    dataConfig: {
+      dataSource: 'ds-sales',
+      filters: [],
+      fields: [
+        { id: 'f1', fieldName: 'orderNo', displayName: '订单号', aggregate: 'none', sortOrder: 'desc', visible: true },
+        { id: 'f2', fieldName: 'orderDate', displayName: '订单日期', aggregate: 'none', sortOrder: 'none', visible: true },
+        { id: 'f3', fieldName: 'customer', displayName: '客户名称', aggregate: 'none', sortOrder: 'none', visible: true },
+        { id: 'f4', fieldName: 'product', displayName: '产品名称', aggregate: 'none', sortOrder: 'none', visible: true },
+        { id: 'f5', fieldName: 'amount', displayName: '金额', aggregate: 'sum', sortOrder: 'none', visible: true },
+        { id: 'f6', fieldName: 'region', displayName: '销售区域', aggregate: 'none', sortOrder: 'none', visible: true },
+        { id: 'f7', fieldName: 'status', displayName: '订单状态', aggregate: 'none', sortOrder: 'none', visible: true },
+        { id: 'f8', fieldName: 'salesperson', displayName: '销售人员', aggregate: 'none', sortOrder: 'none', visible: false },
+        { id: 'f9', fieldName: 'category', displayName: '产品分类', aggregate: 'none', sortOrder: 'none', visible: false },
+        { id: 'f10', fieldName: 'quantity', displayName: '数量', aggregate: 'sum', sortOrder: 'none', visible: false },
+        { id: 'f11', fieldName: 'unitPrice', displayName: '单价', aggregate: 'avg', sortOrder: 'none', visible: false },
+      ],
+      dateRange: getDateRange('daily'),
+    },
   },
   {
     id: 'template-2',
@@ -142,6 +162,23 @@ export const systemTemplates: ReportTemplate[] = [
     isSystem: true,
     useCount: 892,
     createdAt: '2026-02-01',
+    dataConfig: {
+      dataSource: 'ds-users',
+      filters: [],
+      fields: [
+        { id: 'f1', fieldName: 'date', displayName: '日期', aggregate: 'none', sortOrder: 'desc', visible: true },
+        { id: 'f2', fieldName: 'dau', displayName: '日活用户', aggregate: 'avg', sortOrder: 'none', visible: true },
+        { id: 'f3', fieldName: 'wau', displayName: '周活用户', aggregate: 'avg', sortOrder: 'none', visible: true },
+        { id: 'f4', fieldName: 'mau', displayName: '月活用户', aggregate: 'avg', sortOrder: 'none', visible: true },
+        { id: 'f5', fieldName: 'newUsers', displayName: '新增用户', aggregate: 'sum', sortOrder: 'none', visible: true },
+        { id: 'f6', fieldName: 'retention7', displayName: '7日留存', aggregate: 'avg', sortOrder: 'none', visible: true },
+        { id: 'f7', fieldName: 'feature', displayName: '功能模块', aggregate: 'none', sortOrder: 'none', visible: true },
+        { id: 'f8', fieldName: 'usageCount', displayName: '使用次数', aggregate: 'sum', sortOrder: 'none', visible: true },
+        { id: 'f9', fieldName: 'retention30', displayName: '30日留存', aggregate: 'avg', sortOrder: 'none', visible: false },
+        { id: 'f10', fieldName: 'avgSession', displayName: '平均会话时长', aggregate: 'avg', sortOrder: 'none', visible: false },
+      ],
+      dateRange: getDateRange('weekly'),
+    },
   },
   {
     id: 'template-3',
@@ -182,6 +219,22 @@ export const systemTemplates: ReportTemplate[] = [
     isSystem: true,
     useCount: 654,
     createdAt: '2026-01-20',
+    dataConfig: {
+      dataSource: 'ds-finance',
+      filters: [],
+      fields: [
+        { id: 'f1', fieldName: 'date', displayName: '日期', aggregate: 'none', sortOrder: 'desc', visible: true },
+        { id: 'f2', fieldName: 'item', displayName: '项目名称', aggregate: 'none', sortOrder: 'none', visible: true },
+        { id: 'f3', fieldName: 'category', displayName: '分类', aggregate: 'none', sortOrder: 'none', visible: true },
+        { id: 'f4', fieldName: 'income', displayName: '收入', aggregate: 'sum', sortOrder: 'none', visible: true },
+        { id: 'f5', fieldName: 'expense', displayName: '支出', aggregate: 'sum', sortOrder: 'none', visible: true },
+        { id: 'f6', fieldName: 'profit', displayName: '利润', aggregate: 'sum', sortOrder: 'none', visible: true },
+        { id: 'f7', fieldName: 'margin', displayName: '利润率', aggregate: 'avg', sortOrder: 'none', visible: true },
+        { id: 'f8', fieldName: 'balance', displayName: '余额', aggregate: 'avg', sortOrder: 'none', visible: false },
+        { id: 'f9', fieldName: 'cashFlow', displayName: '现金流', aggregate: 'sum', sortOrder: 'none', visible: false },
+      ],
+      dateRange: getDateRange('monthly'),
+    },
   },
   {
     id: 'template-4',
@@ -222,6 +275,23 @@ export const systemTemplates: ReportTemplate[] = [
     isSystem: true,
     useCount: 478,
     createdAt: '2026-02-10',
+    dataConfig: {
+      dataSource: 'ds-marketing',
+      filters: [],
+      fields: [
+        { id: 'f1', fieldName: 'campaign', displayName: '活动名称', aggregate: 'none', sortOrder: 'none', visible: true },
+        { id: 'f2', fieldName: 'channel', displayName: '推广渠道', aggregate: 'none', sortOrder: 'none', visible: true },
+        { id: 'f3', fieldName: 'date', displayName: '日期', aggregate: 'none', sortOrder: 'desc', visible: true },
+        { id: 'f4', fieldName: 'spend', displayName: '投放金额', aggregate: 'sum', sortOrder: 'none', visible: true },
+        { id: 'f5', fieldName: 'impressions', displayName: '曝光量', aggregate: 'sum', sortOrder: 'none', visible: true },
+        { id: 'f6', fieldName: 'clicks', displayName: '点击量', aggregate: 'sum', sortOrder: 'none', visible: true },
+        { id: 'f7', fieldName: 'conversions', displayName: '转化数', aggregate: 'sum', sortOrder: 'none', visible: true },
+        { id: 'f8', fieldName: 'roi', displayName: 'ROI', aggregate: 'avg', sortOrder: 'none', visible: true },
+        { id: 'f9', fieldName: 'leads', displayName: '线索数', aggregate: 'sum', sortOrder: 'none', visible: false },
+        { id: 'f10', fieldName: 'cac', displayName: '获客成本', aggregate: 'avg', sortOrder: 'none', visible: false },
+      ],
+      dateRange: getDateRange('weekly'),
+    },
   },
   {
     id: 'template-5',
@@ -262,6 +332,12 @@ export const systemTemplates: ReportTemplate[] = [
     isSystem: true,
     useCount: 321,
     createdAt: '2026-02-15',
+    dataConfig: {
+      dataSource: 'ds-sales',
+      filters: [],
+      fields: getFieldsForDataSource('ds-sales'),
+      dateRange: getDateRange('monthly'),
+    },
   },
   {
     id: 'template-6',
@@ -273,6 +349,12 @@ export const systemTemplates: ReportTemplate[] = [
     isSystem: true,
     useCount: 267,
     createdAt: '2026-01-25',
+    dataConfig: {
+      dataSource: 'ds-users',
+      filters: [],
+      fields: getFieldsForDataSource('ds-users'),
+      dateRange: getDateRange('weekly'),
+    },
   },
 ];
 
@@ -283,10 +365,54 @@ export const teamTemplates: ReportTemplate[] = [
     description: '华东区域销售团队定制的周度业绩报表',
     category: 'sales',
     thumbnail: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=regional%20sales%20report%20east%20china%20dashboard%20dark%20blue&image_size=square',
-    components: defaultComponents,
+    components: [
+      {
+        id: 'comp-1',
+        type: 'text',
+        position: { x: 0, y: 0, width: 12, height: 2 },
+        config: { content: '华东区域销售周报', fontSize: '28px', fontWeight: 'bold' },
+        style: { color: '#f1f5f9' },
+      },
+      {
+        id: 'comp-2',
+        type: 'lineChart',
+        position: { x: 0, y: 2, width: 6, height: 5 },
+        config: { title: '销售额趋势', xAxisKey: 'date', yAxisKeys: ['sales'], legend: true },
+        style: { backgroundColor: '#1e293b' },
+      },
+      {
+        id: 'comp-3',
+        type: 'barChart',
+        position: { x: 6, y: 2, width: 6, height: 5 },
+        config: { title: '各城市销售对比', xAxisKey: 'region', yAxisKey: 'sales', legend: true },
+        style: { backgroundColor: '#1e293b' },
+      },
+      {
+        id: 'comp-4',
+        type: 'table',
+        position: { x: 0, y: 7, width: 12, height: 6 },
+        config: { title: '订单明细', columns: ['orderNo', 'customer', 'amount', 'status'], pageSize: 10 },
+        style: { backgroundColor: '#1e293b' },
+      },
+    ],
     isSystem: false,
     useCount: 89,
     createdAt: '2026-03-01',
+    dataConfig: {
+      dataSource: 'ds-sales',
+      filters: [
+        { id: 'flt1', field: 'region', operator: 'eq', value: '华东' },
+      ],
+      fields: [
+        { id: 'f1', fieldName: 'orderNo', displayName: '订单号', aggregate: 'none', sortOrder: 'desc', visible: true },
+        { id: 'f2', fieldName: 'orderDate', displayName: '订单日期', aggregate: 'none', sortOrder: 'none', visible: true },
+        { id: 'f3', fieldName: 'customer', displayName: '客户名称', aggregate: 'none', sortOrder: 'none', visible: true },
+        { id: 'f4', fieldName: 'amount', displayName: '金额', aggregate: 'sum', sortOrder: 'desc', visible: true },
+        { id: 'f5', fieldName: 'region', displayName: '销售区域', aggregate: 'none', sortOrder: 'none', visible: true },
+        { id: 'f6', fieldName: 'status', displayName: '订单状态', aggregate: 'none', sortOrder: 'none', visible: true },
+      ],
+      dateRange: getDateRange('weekly'),
+    },
   },
   {
     id: 'team-2',
@@ -294,10 +420,52 @@ export const teamTemplates: ReportTemplate[] = [
     description: '产品团队使用的用户行为深度分析报表',
     category: 'operation',
     thumbnail: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=user%20behavior%20analytics%20product%20metrics%20heatmap%20dark&image_size=square',
-    components: defaultComponents,
+    components: [
+      {
+        id: 'comp-1',
+        type: 'text',
+        position: { x: 0, y: 0, width: 12, height: 2 },
+        config: { content: '产品用户行为分析', fontSize: '28px', fontWeight: 'bold' },
+        style: { color: '#f1f5f9' },
+      },
+      {
+        id: 'comp-2',
+        type: 'lineChart',
+        position: { x: 0, y: 2, width: 7, height: 5 },
+        config: { title: '用户活跃度趋势', xAxisKey: 'date', yAxisKeys: ['dau', 'newUsers'], legend: true },
+        style: { backgroundColor: '#1e293b' },
+      },
+      {
+        id: 'comp-3',
+        type: 'barChart',
+        position: { x: 7, y: 2, width: 5, height: 5 },
+        config: { title: '功能使用率', xAxisKey: 'feature', yAxisKey: 'usage', legend: false },
+        style: { backgroundColor: '#1e293b' },
+      },
+      {
+        id: 'comp-4',
+        type: 'table',
+        position: { x: 0, y: 7, width: 12, height: 6 },
+        config: { title: '用户行为明细', columns: ['date', 'dau', 'newUsers', 'retention7'], pageSize: 10 },
+        style: { backgroundColor: '#1e293b' },
+      },
+    ],
     isSystem: false,
     useCount: 56,
     createdAt: '2026-03-05',
+    dataConfig: {
+      dataSource: 'ds-users',
+      filters: [],
+      fields: [
+        { id: 'f1', fieldName: 'date', displayName: '日期', aggregate: 'none', sortOrder: 'desc', visible: true },
+        { id: 'f2', fieldName: 'dau', displayName: '日活用户', aggregate: 'avg', sortOrder: 'none', visible: true },
+        { id: 'f3', fieldName: 'newUsers', displayName: '新增用户', aggregate: 'sum', sortOrder: 'none', visible: true },
+        { id: 'f4', fieldName: 'retention7', displayName: '7日留存', aggregate: 'avg', sortOrder: 'none', visible: true },
+        { id: 'f5', fieldName: 'feature', displayName: '功能模块', aggregate: 'none', sortOrder: 'none', visible: true },
+        { id: 'f6', fieldName: 'usageCount', displayName: '使用次数', aggregate: 'sum', sortOrder: 'desc', visible: true },
+      ],
+      dateRange: getDateRange('weekly'),
+    },
   },
 ];
 

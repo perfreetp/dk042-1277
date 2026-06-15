@@ -23,7 +23,13 @@ interface BarChartProps {
 
 export function BarChart({ component, selected, onSelect, dataConfig }: BarChartProps) {
   const dataSourceId = dataConfig?.dataSource || 'ds-sales';
-  const data = useMemo(() => generateRegionChartData(dataSourceId), [dataSourceId]);
+  const filters = dataConfig?.filters || [];
+  const dateRange = dataConfig?.dateRange;
+
+  const data = useMemo(
+    () => generateRegionChartData(dataSourceId, filters, dateRange),
+    [dataSourceId, filters, dateRange]
+  );
   const colors = ['#3b82f6', '#60a5fa', '#1d4ed8', '#10b981', '#34d399', '#059669', '#f59e0b'];
 
   const yAxisKey = useMemo(() => {

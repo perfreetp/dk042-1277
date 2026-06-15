@@ -12,7 +12,6 @@ import {
   Clock,
 } from 'lucide-react';
 import { useReportStore } from '../store/useReportStore';
-import { systemTemplates, teamTemplates } from '../data/templates';
 import type { TemplateCategory } from '../types';
 
 const categoryConfig: Record<TemplateCategory, { label: string; icon: any; color: string }> = {
@@ -28,13 +27,16 @@ export function TemplateLibrary() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('system');
   const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | 'all'>('all');
-  const { createReportFromTemplate, createBlankReport } = useReportStore();
+  const { templates, createReportFromTemplate, createBlankReport } = useReportStore();
 
-  const templates = activeTab === 'system' ? systemTemplates : teamTemplates;
+  const systemTemplates = templates.filter(t => t.isSystem);
+  const teamTemplates = templates.filter(t => !t.isSystem);
+
+  const displayTemplates = activeTab === 'system' ? systemTemplates : teamTemplates;
 
   const filteredTemplates = selectedCategory === 'all'
-    ? templates
-    : templates.filter(t => t.category === selectedCategory);
+    ? displayTemplates
+    : displayTemplates.filter(t => t.category === selectedCategory);
 
   const handleUseTemplate = (templateId: string) => {
     createReportFromTemplate(templateId);

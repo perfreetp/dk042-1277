@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Settings } from 'lucide-react';
-import { generateTableData, getFieldLabel } from '../../data/mockData';
+import { generateTableData, getFieldLabel, calculateSummary } from '../../data/mockData';
 import type { ReportComponent, Report, FieldConfig } from '../../types';
 
 interface ReportTableProps {
@@ -17,10 +17,11 @@ export function ReportTable({ component, selected, onSelect, dataConfig }: Repor
   const dataSourceId = dataConfig?.dataSource || 'ds-sales';
   const filters = dataConfig?.filters || [];
   const fields = dataConfig?.fields;
+  const dateRange = dataConfig?.dateRange;
 
   const data = useMemo(
-    () => generateTableData(dataSourceId, 30, filters, fields),
-    [dataSourceId, filters, fields]
+    () => generateTableData(dataSourceId, 50, filters, fields, dateRange),
+    [dataSourceId, filters, fields, dateRange]
   );
 
   const visibleFields = useMemo(() => {
@@ -54,7 +55,14 @@ export function ReportTable({ component, selected, onSelect, dataConfig }: Repor
     }));
   }, [fields, component.config.columns, dataSourceId]);
 
-  const columns = visibleFields.map(f => f.fieldName);
+  const summary = useMemo(
+    () => calculateSummary(data, visibleFields as FieldConfig[]),
+    [data, visibleFields]
+  );
+
+  const hasSummary = visibleFields.some((f: FieldConfig) => f.aggregate !== 'none');
+
+  const columns = visibleFields.map((f: FieldConfig) => f.fieldName);
   const totalPages = Math.ceil(data.length / pageSize);
   const paginatedData = data.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
@@ -145,6 +153,37 @@ export function ReportTable({ component, selected, onSelect, dataConfig }: Repor
                 ))}
               </tr>
             ))}
+            {hasSummary && (
+              <tr className="border-t-2 border-primary-600/30 bg-primary-600/5">
+                {columns.map((col: string, idx: number) => {
+                  const field = visibleFields.find((f: FieldConfig) => f.fieldName === col);
+                  const isAgg = field && field.aggregate !== 'none';
+                  const aggLabels: Record<string, string> = {
+                    sum: '合计', avg: '平均', count: '计数', max: '最大', min: '最小',
+                  };
+                  return (
+                    <td
+                      key={col}
+                      className={`px-4 py-3 whitespace-nowrap font-semibold ${
+                        isAgg ? 'text-primary-400' : 'text-dark-400'
+                      }`}
+                    >
+                      {idx === 0 && !isAgg ? (
+                        <span className="text-primary-400">
+                          {field?.aggregate && field.aggregate !== 'none'
+                            ? aggLabels[field.aggregate]
+                            : '汇总'}
+                        </span>
+                      ) : isAgg ? (
+                        formatValue(col, summary[col])
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

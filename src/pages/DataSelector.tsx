@@ -16,6 +16,8 @@ import { useReportStore } from '../store/useReportStore';
 import { dataSources } from '../data/mockData';
 import type { FilterOperator, AggregateType, SortOrder } from '../types';
 
+import { getDateRange } from '../utils/dateUtils';
+
 const operatorLabels: Record<FilterOperator, string> = {
   eq: '等于',
   ne: '不等于',
@@ -175,17 +177,29 @@ export function DataSelector() {
                 />
               </div>
               <div className="flex gap-2">
-                {['daily', 'weekly', 'monthly', 'quarterly'].map((period) => (
-                  <button
-                    key={period}
-                    className="flex-1 px-3 py-2 bg-dark-700 hover:bg-dark-600 text-dark-300 hover:text-white rounded-lg text-xs font-medium transition-colors"
-                  >
-                    {period === 'daily' && '今日'}
-                    {period === 'weekly' && '本周'}
-                    {period === 'monthly' && '本月'}
-                    {period === 'quarterly' && '本季度'}
-                  </button>
-                ))}
+                {(['daily', 'weekly', 'monthly', 'quarterly'] as const).map((period) => {
+                  const isActive = currentReport.dataConfig.dateRange.start === getDateRange(period).start &&
+                    currentReport.dataConfig.dateRange.end === getDateRange(period).end;
+                  return (
+                    <button
+                      key={period}
+                      onClick={() => {
+                        const range = getDateRange(period);
+                        updateDataConfig({ dateRange: range });
+                      }}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                        isActive
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-dark-700 hover:bg-dark-600 text-dark-300 hover:text-white'
+                      }`}
+                    >
+                      {period === 'daily' && '今日'}
+                      {period === 'weekly' && '本周'}
+                      {period === 'monthly' && '本月'}
+                      {period === 'quarterly' && '本季度'}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>

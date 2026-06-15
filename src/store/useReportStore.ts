@@ -88,7 +88,14 @@ interface ReportStore {
 }
 
 const systemTemplates = allTemplates.filter(t => t.isSystem);
-const initialTeamTemplates = loadTeamTemplates();
+const staticTeamTemplates = allTemplates.filter(t => !t.isSystem);
+const savedTeamTemplates = loadTeamTemplates();
+
+const existingIds = new Set(savedTeamTemplates.map(t => t.id));
+const initialTeamTemplates = [
+  ...savedTeamTemplates,
+  ...staticTeamTemplates.filter(t => !existingIds.has(t.id)),
+];
 
 export const useReportStore = create<ReportStore>((set, get) => ({
   templates: [...systemTemplates, ...initialTeamTemplates],
@@ -107,11 +114,14 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       throw new Error('Template not found');
     }
 
-    const dateRange = getDateRange('weekly');
     const dataSource = template.dataConfig?.dataSource || 'ds-sales';
     const fields = template.dataConfig?.fields
       ? template.dataConfig.fields.map(f => ({ ...f, id: generateId() }))
       : getFieldsForDataSource(dataSource);
+    const filters = template.dataConfig?.filters
+      ? template.dataConfig.filters.map(f => ({ ...f, id: generateId() }))
+      : [];
+    const dateRange = template.dataConfig?.dateRange || getDateRange('weekly');
 
     const report: Report = {
       id: generateId(),
@@ -126,7 +136,7 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       })),
       dataConfig: {
         dataSource,
-        filters: [],
+        filters,
         fields,
         dateRange,
       },

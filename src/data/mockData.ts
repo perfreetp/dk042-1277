@@ -93,106 +93,137 @@ const seededRandom = (seed: number) => {
 
 export const generateChartData = (
   dataSourceId: string,
-  period: 'daily' | 'weekly' | 'monthly'
+  period: 'daily' | 'weekly' | 'monthly' | 'quarterly',
+  filters?: Report['dataConfig']['filters'],
+  dateRange?: { start: string; end: string },
 ): ChartDataPoint[] => {
-  const labels = period === 'daily'
+  const rawData = generateTableData(dataSourceId, 100, filters, undefined, dateRange);
+
+  if (rawData.length === 0) {
+    return [];
+  }
+
+  const dateField = dataSourceId === 'ds-sales' ? 'orderDate' : 'date';
+
+  const getPeriodKey = (dateStr: string): string => {
+    const d = new Date(dateStr);
+    if (period === 'daily') {
+      const day = d.getDay();
+      const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+      return days[day];
+    }
+    if (period === 'weekly') {
+      const weekNum = Math.ceil(d.getDate() / 7);
+      return `第${weekNum}周`;
+    }
+    if (period === 'monthly') {
+      return `${d.getMonth() + 1}月`;
+    }
+    const q = Math.ceil((d.getMonth() + 1) / 3);
+    return `Q${q}`;
+  };
+
+  const aggregated: Record<string, Record<string, number>> = {};
+
+  for (const row of rawData) {
+    const key = getPeriodKey(String(row[dateField]));
+    if (!aggregated[key]) {
+      aggregated[key] = {};
+    }
+    for (const [k, v] of Object.entries(row)) {
+      if (typeof v === 'number') {
+        if (aggregated[key][k] === undefined) {
+          aggregated[key][k] = 0;
+        }
+        aggregated[key][k] += v;
+      }
+    }
+  }
+
+  const defaultLabels = period === 'daily'
     ? ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
     : period === 'weekly'
     ? ['第1周', '第2周', '第3周', '第4周']
-    : ['1月', '2月', '3月', '4月', '5月', '6月'];
+    : period === 'monthly'
+    ? ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+    : ['Q1', 'Q2', 'Q3', 'Q4'];
 
-  const seed = dataSourceId.charCodeAt(3) + (period === 'daily' ? 1 : period === 'weekly' ? 2 : 3);
+  const keys = Object.keys(aggregated).length > 0
+    ? defaultLabels.filter(l => aggregated[l] !== undefined).length > 0
+      ? defaultLabels.filter(l => aggregated[l] !== undefined)
+      : Object.keys(aggregated).sort()
+    : defaultLabels;
 
-  switch (dataSourceId) {
-    case 'ds-sales': {
-      return labels.map((label, i) => {
-        const sales = Math.floor(seededRandom(seed + i * 7) * 50000) + 30000;
-        return {
-          name: label,
-          value: sales,
-          sales,
-          orders: Math.floor(seededRandom(seed + i * 13) * 500) + 200,
-          customers: Math.floor(seededRandom(seed + i * 17) * 200) + 100,
-        };
-      });
-    }
-    case 'ds-users': {
-      return labels.map((label, i) => ({
-        name: label,
-        value: Math.floor(seededRandom(seed + i * 7) * 8000) + 5000,
-        dau: Math.floor(seededRandom(seed + i * 7) * 8000) + 5000,
-        wau: Math.floor(seededRandom(seed + i * 11) * 20000) + 15000,
-        mau: Math.floor(seededRandom(seed + i * 13) * 50000) + 40000,
-        newUsers: Math.floor(seededRandom(seed + i * 17) * 1500) + 500,
-      }));
-    }
-    case 'ds-finance': {
-      return labels.map((label, i) => ({
-        name: label,
-        value: Math.floor(seededRandom(seed + i * 7) * 800000) + 500000,
-        income: Math.floor(seededRandom(seed + i * 7) * 800000) + 500000,
-        expense: Math.floor(seededRandom(seed + i * 11) * 400000) + 200000,
-        profit: Math.floor(seededRandom(seed + i * 13) * 400000) + 100000,
-      }));
-    }
-    case 'ds-marketing': {
-      return labels.map((label, i) => ({
-        name: label,
-        value: Math.floor(seededRandom(seed + i * 7) * 300) + 100,
-        spend: Math.floor(seededRandom(seed + i * 7) * 50000) + 20000,
-        conversions: Math.floor(seededRandom(seed + i * 11) * 300) + 100,
-        roi: Math.round((seededRandom(seed + i * 13) * 3 + 0.5) * 100) / 100,
-      }));
-    }
-    default:
-      return labels.map((label, i) => ({
-        name: label,
-        value: Math.floor(seededRandom(seed + i * 7) * 1000) + 100,
-      }));
-  }
+  return keys.map(key => ({
+    name: key,
+    value: aggregated[key]?.value || 0,
+    ...aggregated[key],
+  }));
 };
 
-export const generateRegionChartData = (dataSourceId?: string): ChartDataPoint[] => {
-  if (dataSourceId === 'ds-users') {
-    return [
-      { name: '首页', value: 45600, usage: 45600 },
-      { name: '搜索', value: 32100, usage: 32100 },
-      { name: '推荐', value: 28700, usage: 28700 },
-      { name: '社区', value: 19500, usage: 19500 },
-      { name: '商城', value: 15800, usage: 15800 },
-      { name: '消息', value: 12300, usage: 12300 },
-      { name: '设置', value: 8900, usage: 8900 },
-    ];
+export const generateRegionChartData = (
+  dataSourceId: string = 'ds-sales',
+  filters?: Report['dataConfig']['filters'],
+  dateRange?: { start: string; end: string },
+): ChartDataPoint[] => {
+  const rawData = generateTableData(dataSourceId, 100, filters, undefined, dateRange);
+
+  if (rawData.length === 0) {
+    return [];
   }
-  if (dataSourceId === 'ds-finance') {
-    return [
-      { name: 'SaaS订阅', value: 568000, income: 568000 },
-      { name: '技术服务', value: 324500, income: 324500 },
-      { name: '咨询服务', value: 198200, income: 198200 },
-      { name: '数据服务', value: 156300, income: 156300 },
-      { name: '培训收入', value: 87400, income: 87400 },
-      { name: '许可费', value: 65200, income: 65200 },
-    ];
+
+  let categoryField: string;
+  let valueField: string;
+
+  switch (dataSourceId) {
+    case 'ds-users':
+      categoryField = 'feature';
+      valueField = 'usageCount';
+      break;
+    case 'ds-finance':
+      categoryField = 'category';
+      valueField = 'income';
+      break;
+    case 'ds-marketing':
+      categoryField = 'channel';
+      valueField = 'spend';
+      break;
+    default:
+      categoryField = 'region';
+      valueField = 'amount';
   }
-  if (dataSourceId === 'ds-marketing') {
-    return [
-      { name: '搜索广告', value: 285, roi: 2.8 },
-      { name: '信息流', value: 198, roi: 1.9 },
-      { name: '社交媒体', value: 156, roi: 2.3 },
-      { name: '内容营销', value: 134, roi: 3.5 },
-      { name: '邮件营销', value: 89, roi: 4.2 },
-      { name: 'KOL合作', value: 67, roi: 1.6 },
-    ];
+
+  const aggregated: Record<string, Record<string, number>> = {};
+
+  for (const row of rawData) {
+    const cat = String(row[categoryField] || '未知');
+    if (!aggregated[cat]) {
+      aggregated[cat] = { [valueField]: 0 };
+    }
+    for (const [k, v] of Object.entries(row)) {
+      if (typeof v === 'number') {
+        if (aggregated[cat][k] === undefined) {
+          aggregated[cat][k] = 0;
+        }
+        aggregated[cat][k] += v;
+      }
+    }
   }
-  return [
-    { name: '华东', value: 156800, sales: 156800 },
-    { name: '华南', value: 124500, sales: 124500 },
-    { name: '华北', value: 98200, sales: 98200 },
-    { name: '西南', value: 76300, sales: 76300 },
-    { name: '华中', value: 65400, sales: 65400 },
-    { name: '西北', value: 45600, sales: 45600 },
-    { name: '东北', value: 38900, sales: 38900 },
-  ];
+
+  const results = Object.entries(aggregated)
+    .map(([name, vals]) => ({
+      name,
+      value: vals[valueField] || 0,
+      [valueField]: vals[valueField] || 0,
+      sales: vals.amount || vals.sales || 0,
+      usage: vals.usageCount || vals.usage || 0,
+      income: vals.income || 0,
+      roi: vals.roi || 0,
+      ...vals,
+    }))
+    .sort((a, b) => (b.value as number) - (a.value as number));
+
+  return results.slice(0, 10);
 };
 
 export const generateTableData = (
@@ -200,57 +231,75 @@ export const generateTableData = (
   count: number = 20,
   filters?: Report['dataConfig']['filters'],
   fields?: FieldConfig[],
+  dateRange?: { start: string; end: string },
 ): TableDataRow[] => {
   let data: TableDataRow[];
+  const startDate = dateRange?.start ? new Date(dateRange.start) : null;
+  const endDate = dateRange?.end ? new Date(dateRange.end) : null;
 
   switch (dataSourceId) {
     case 'ds-users': {
       const features = ['首页', '搜索', '推荐', '社区', '商城', '消息', '设置'];
-      data = Array.from({ length: count }, (_, i) => ({
-        date: new Date(Date.now() - i * 86400000).toISOString().split('T')[0],
-        dau: Math.floor(Math.random() * 8000) + 5000,
-        wau: Math.floor(Math.random() * 20000) + 15000,
-        mau: Math.floor(Math.random() * 50000) + 40000,
-        newUsers: Math.floor(Math.random() * 1500) + 500,
-        retention7: Math.round((Math.random() * 30 + 30) * 10) / 10,
-        retention30: Math.round((Math.random() * 20 + 15) * 10) / 10,
-        avgSession: Math.round((Math.random() * 15 + 5) * 10) / 10,
-        feature: features[Math.floor(Math.random() * features.length)],
-        usageCount: Math.floor(Math.random() * 5000) + 1000,
-      }));
+      data = Array.from({ length: count }, (_, i) => {
+        const date = endDate
+          ? new Date(endDate.getTime() - i * 86400000)
+          : new Date(Date.now() - i * 86400000);
+        return {
+          date: date.toISOString().split('T')[0],
+          dau: Math.floor(Math.random() * 8000) + 5000,
+          wau: Math.floor(Math.random() * 20000) + 15000,
+          mau: Math.floor(Math.random() * 50000) + 40000,
+          newUsers: Math.floor(Math.random() * 1500) + 500,
+          retention7: Math.round((Math.random() * 30 + 30) * 10) / 10,
+          retention30: Math.round((Math.random() * 20 + 15) * 10) / 10,
+          avgSession: Math.round((Math.random() * 15 + 5) * 10) / 10,
+          feature: features[Math.floor(Math.random() * features.length)],
+          usageCount: Math.floor(Math.random() * 5000) + 1000,
+        };
+      });
       break;
     }
     case 'ds-finance': {
       const items = ['SaaS订阅收入', '技术服务费', '咨询服务费', '数据服务费', '人力成本', '办公费用', '营销支出', '研发投入', '培训收入'];
       const categories = ['主营收入', '其他收入', '运营成本', '人力成本', '营销费用', '研发费用'];
-      data = Array.from({ length: count }, (_, i) => ({
-        date: new Date(Date.now() - i * 86400000).toISOString().split('T')[0],
-        item: items[Math.floor(Math.random() * items.length)],
-        category: categories[Math.floor(Math.random() * categories.length)],
-        income: Math.floor(Math.random() * 500000) + 100000,
-        expense: Math.floor(Math.random() * 200000) + 50000,
-        profit: Math.floor(Math.random() * 300000) + 50000,
-        margin: Math.round((Math.random() * 30 + 10) * 10) / 10,
-        balance: Math.floor(Math.random() * 2000000) + 500000,
-        cashFlow: Math.floor(Math.random() * 500000) - 100000,
-      }));
+      data = Array.from({ length: count }, (_, i) => {
+        const date = endDate
+          ? new Date(endDate.getTime() - i * 86400000)
+          : new Date(Date.now() - i * 86400000);
+        return {
+          date: date.toISOString().split('T')[0],
+          item: items[Math.floor(Math.random() * items.length)],
+          category: categories[Math.floor(Math.random() * categories.length)],
+          income: Math.floor(Math.random() * 500000) + 100000,
+          expense: Math.floor(Math.random() * 200000) + 50000,
+          profit: Math.floor(Math.random() * 300000) + 50000,
+          margin: Math.round((Math.random() * 30 + 10) * 10) / 10,
+          balance: Math.floor(Math.random() * 2000000) + 500000,
+          cashFlow: Math.floor(Math.random() * 500000) - 100000,
+        };
+      });
       break;
     }
     case 'ds-marketing': {
       const campaigns = ['春季大促', '新品发布', '会员日', '周年庆', '暑期活动', '双十一预热', '年末清仓'];
       const channels = ['搜索广告', '信息流', '社交媒体', '内容营销', '邮件营销', 'KOL合作'];
-      data = Array.from({ length: count }, (_, i) => ({
-        campaign: campaigns[Math.floor(Math.random() * campaigns.length)],
-        channel: channels[Math.floor(Math.random() * channels.length)],
-        date: new Date(Date.now() - i * 86400000).toISOString().split('T')[0],
-        spend: Math.floor(Math.random() * 50000) + 5000,
-        impressions: Math.floor(Math.random() * 100000) + 10000,
-        clicks: Math.floor(Math.random() * 10000) + 1000,
-        leads: Math.floor(Math.random() * 500) + 50,
-        conversions: Math.floor(Math.random() * 100) + 10,
-        cac: Math.round((Math.random() * 200 + 50) * 10) / 10,
-        roi: Math.round((Math.random() * 3 + 0.5) * 100) / 100,
-      }));
+      data = Array.from({ length: count }, (_, i) => {
+        const date = endDate
+          ? new Date(endDate.getTime() - i * 86400000)
+          : new Date(Date.now() - i * 86400000);
+        return {
+          campaign: campaigns[Math.floor(Math.random() * campaigns.length)],
+          channel: channels[Math.floor(Math.random() * channels.length)],
+          date: date.toISOString().split('T')[0],
+          spend: Math.floor(Math.random() * 50000) + 5000,
+          impressions: Math.floor(Math.random() * 100000) + 10000,
+          clicks: Math.floor(Math.random() * 10000) + 1000,
+          leads: Math.floor(Math.random() * 500) + 50,
+          conversions: Math.floor(Math.random() * 100) + 10,
+          cac: Math.round((Math.random() * 200 + 50) * 10) / 10,
+          roi: Math.round((Math.random() * 3 + 0.5) * 100) / 100,
+        };
+      });
       break;
     }
     default: {
@@ -260,21 +309,34 @@ export const generateTableData = (
       const regions = ['华东', '华南', '华北', '西南', '华中', '西北', '东北'];
       const statuses = ['已完成', '处理中', '待付款', '已取消'];
       const salespersons = ['张三', '李四', '王五', '赵六', '钱七', '孙八'];
-      data = Array.from({ length: count }, (_, i) => ({
-        orderNo: `ORD${String(20260001 + i).padStart(8, '0')}`,
-        orderDate: new Date(Date.now() - i * 86400000).toISOString().split('T')[0],
-        customer: customers[Math.floor(Math.random() * customers.length)],
-        product: products[Math.floor(Math.random() * products.length)],
-        category: categories[Math.floor(Math.random() * categories.length)],
-        quantity: Math.floor(Math.random() * 100) + 1,
-        unitPrice: Math.floor(Math.random() * 5000) + 1000,
-        amount: Math.floor(Math.random() * 100000) + 5000,
-        region: regions[Math.floor(Math.random() * regions.length)],
-        salesperson: salespersons[Math.floor(Math.random() * salespersons.length)],
-        status: statuses[Math.floor(Math.random() * statuses.length)],
-      }));
+      data = Array.from({ length: count }, (_, i) => {
+        const date = endDate
+          ? new Date(endDate.getTime() - i * 86400000)
+          : new Date(Date.now() - i * 86400000);
+        return {
+          orderNo: `ORD${String(20260001 + i).padStart(8, '0')}`,
+          orderDate: date.toISOString().split('T')[0],
+          customer: customers[Math.floor(Math.random() * customers.length)],
+          product: products[Math.floor(Math.random() * products.length)],
+          category: categories[Math.floor(Math.random() * categories.length)],
+          quantity: Math.floor(Math.random() * 100) + 1,
+          unitPrice: Math.floor(Math.random() * 5000) + 1000,
+          amount: Math.floor(Math.random() * 100000) + 5000,
+          region: regions[Math.floor(Math.random() * regions.length)],
+          salesperson: salespersons[Math.floor(Math.random() * salespersons.length)],
+          status: statuses[Math.floor(Math.random() * statuses.length)],
+        };
+      });
       break;
     }
+  }
+
+  if (startDate && endDate) {
+    const dateField = dataSourceId === 'ds-sales' ? 'orderDate' : 'date';
+    data = data.filter(row => {
+      const rowDate = new Date(String(row[dateField]));
+      return rowDate >= startDate && rowDate <= new Date(endDate.getTime() + 86400000);
+    });
   }
 
   if (filters && filters.length > 0) {
@@ -295,7 +357,73 @@ export const generateTableData = (
     });
   }
 
+  if (fields && fields.length > 0) {
+    const sortFields = fields.filter(f => f.sortOrder !== 'none');
+    if (sortFields.length > 0) {
+      data = [...data].sort((a, b) => {
+        for (const sf of sortFields) {
+          const av = a[sf.fieldName];
+          const bv = b[sf.fieldName];
+          if (av === undefined || bv === undefined) continue;
+          const aNum = Number(av);
+          const bNum = Number(bv);
+          let cmp: number;
+          if (!isNaN(aNum) && !isNaN(bNum)) {
+            cmp = aNum - bNum;
+          } else {
+            cmp = String(av).localeCompare(String(bv));
+          }
+          if (cmp !== 0) {
+            return sf.sortOrder === 'desc' ? -cmp : cmp;
+          }
+        }
+        return 0;
+      });
+    }
+  }
+
   return data;
+};
+
+export const calculateSummary = (
+  data: TableDataRow[],
+  fields: FieldConfig[],
+): Record<string, number | string> => {
+  const summary: Record<string, number | string> = {};
+  const numericFields = fields.filter(f => f.aggregate !== 'none' && f.visible);
+
+  for (const field of numericFields) {
+    const values = data
+      .map(row => Number(row[field.fieldName]))
+      .filter(v => !isNaN(v));
+
+    if (values.length === 0) {
+      summary[field.fieldName] = '-';
+      continue;
+    }
+
+    switch (field.aggregate) {
+      case 'sum':
+        summary[field.fieldName] = values.reduce((a, b) => a + b, 0);
+        break;
+      case 'avg':
+        summary[field.fieldName] = Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 100) / 100;
+        break;
+      case 'count':
+        summary[field.fieldName] = values.length;
+        break;
+      case 'max':
+        summary[field.fieldName] = Math.max(...values);
+        break;
+      case 'min':
+        summary[field.fieldName] = Math.min(...values);
+        break;
+      default:
+        summary[field.fieldName] = '-';
+    }
+  }
+
+  return summary;
 };
 
 export const getFieldLabel = (fieldName: string, dataSourceId: string): string => {

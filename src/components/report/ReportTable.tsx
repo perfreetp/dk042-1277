@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Settings } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Settings, ArrowUp, ArrowDown } from 'lucide-react';
 import { generateTableData, getFieldLabel, calculateSummary } from '../../data/mockData';
 import type { ReportComponent, Report, FieldConfig } from '../../types';
 
@@ -124,14 +124,41 @@ export function ReportTable({ component, selected, onSelect, dataConfig }: Repor
         <table className="w-full text-sm">
           <thead className="bg-dark-700/50 sticky top-0">
             <tr>
-              {columns.map((col: string) => (
-                <th
-                  key={col}
-                  className="px-4 py-3 text-left font-medium text-dark-300 whitespace-nowrap"
-                >
-                  {getColumnLabel(col)}
-                </th>
-              ))}
+              {columns.map((col: string) => {
+                const field = visibleFields.find((f: FieldConfig) => f.fieldName === col);
+                const sortOrder = field?.sortOrder || 'none';
+                const sortFields = visibleFields.filter((f: FieldConfig) => f.sortOrder !== 'none');
+                const sortPriority = sortOrder !== 'none'
+                  ? sortFields.findIndex((f: FieldConfig) => f.fieldName === col) + 1
+                  : null;
+
+                return (
+                  <th
+                    key={col}
+                    className="px-4 py-3 text-left font-medium whitespace-nowrap"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className={sortOrder !== 'none' ? 'text-primary-400' : 'text-dark-300'}>
+                        {getColumnLabel(col)}
+                      </span>
+                      {sortOrder !== 'none' && (
+                        <span className="flex items-center gap-0.5">
+                          {sortPriority && sortPriority > 1 && (
+                            <span className="text-[10px] px-1 py-0.5 rounded bg-primary-600/30 text-primary-300 font-medium">
+                              {sortPriority}
+                            </span>
+                          )}
+                          {sortOrder === 'asc' ? (
+                            <ArrowUp className="w-3.5 h-3.5 text-primary-400" />
+                          ) : (
+                            <ArrowDown className="w-3.5 h-3.5 text-primary-400" />
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>

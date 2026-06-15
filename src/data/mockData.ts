@@ -86,9 +86,12 @@ export const getFieldsForDataSource = (dsId: string): FieldConfig[] => {
 
 export const defaultFields: FieldConfig[] = getFieldsForDataSource('ds-sales');
 
-const seededRandom = (seed: number) => {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
+const createSeededRandom = (seed: number) => {
+  let current = seed;
+  return () => {
+    current = Math.sin(current) * 10000;
+    return current - Math.floor(current);
+  };
 };
 
 export const generateChartData = (
@@ -97,7 +100,7 @@ export const generateChartData = (
   filters?: Report['dataConfig']['filters'],
   dateRange?: { start: string; end: string },
 ): ChartDataPoint[] => {
-  const rawData = generateTableData(dataSourceId, 100, filters, undefined, dateRange);
+  const rawData = generateTableData(dataSourceId, 200, filters, undefined, dateRange);
 
   if (rawData.length === 0) {
     return [];
@@ -114,7 +117,7 @@ export const generateChartData = (
     }
     if (period === 'weekly') {
       const weekNum = Math.ceil(d.getDate() / 7);
-      return `第${weekNum}周`;
+      return `第${Math.min(weekNum, 4)}周`;
     }
     if (period === 'monthly') {
       return `${d.getMonth() + 1}月`;
@@ -122,6 +125,15 @@ export const generateChartData = (
     const q = Math.ceil((d.getMonth() + 1) / 3);
     return `Q${q}`;
   };
+
+  const periodOrder: Record<string, string[]> = {
+    daily: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+    weekly: ['第1周', '第2周', '第3周', '第4周'],
+    monthly: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+    quarterly: ['Q1', 'Q2', 'Q3', 'Q4'],
+  };
+
+  const order = periodOrder[period] || periodOrder.weekly;
 
   const aggregated: Record<string, Record<string, number>> = {};
 
@@ -140,42 +152,35 @@ export const generateChartData = (
     }
   }
 
-  const defaultLabels = period === 'daily'
-    ? ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-    : period === 'weekly'
-    ? ['第1周', '第2周', '第3周', '第4周']
-    : period === 'monthly'
-    ? ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
-    : ['Q1', 'Q2', 'Q3', 'Q4'];
+  const keys = order.filter(k => aggregated[k] !== undefined);
+  const finalKeys = keys.length > 0 ? keys : Object.keys(aggregated);
 
-  const keys = Object.keys(aggregated).length > 0
-    ? defaultLabels.filter(l => aggregated[l] !== undefined).length > 0
-      ? defaultLabels.filter(l => aggregated[l] !== undefined)
-      : Object.keys(aggregated).sort()
-    : defaultLabels;
-
-  return keys.map(key => {
+  return finalKeys.map(key => {
     const agg = aggregated[key] || {};
     const result: Record<string, any> = {
       name: key,
-      value: agg.value || 0,
+      value: 0,
       ...agg,
     };
     if (dataSourceId === 'ds-sales') {
       result.sales = result.amount || result.sales || 0;
       result.orders = result.quantity || result.orders || 0;
+      result.value = result.sales;
     }
     if (dataSourceId === 'ds-users') {
       result.usage = result.usageCount || result.usage || 0;
       result.activeUsers = result.dau || result.activeUsers || 0;
+      result.value = result.dau;
     }
     if (dataSourceId === 'ds-finance') {
       result.revenue = result.income || result.revenue || 0;
+      result.value = result.income;
     }
     if (dataSourceId === 'ds-marketing') {
       result.conversionRate = result.roi || result.conversionRate || 0;
+      result.value = result.conversions;
     }
-    return result;
+    return result as ChartDataPoint;
   });
 };
 
@@ -246,7 +251,7 @@ export const generateRegionChartData = (
 
 export const generateTableData = (
   dataSourceId: string = 'ds-sales',
-  count: number = 20,
+  count: number = 50,
   filters?: Report['dataConfig']['filters'],
   fields?: FieldConfig[],
   dateRange?: { start: string; end: string },
@@ -254,6 +259,9 @@ export const generateTableData = (
   let data: TableDataRow[];
   const startDate = dateRange?.start ? new Date(dateRange.start) : null;
   const endDate = dateRange?.end ? new Date(dateRange.end) : null;
+
+  const seedBase = dataSourceId.charCodeAt(3) + (dateRange?.start?.length || 0);
+  const seededRandom = createSeededRandom(seedBase);
 
   switch (dataSourceId) {
     case 'ds-users': {
@@ -264,15 +272,15 @@ export const generateTableData = (
           : new Date(Date.now() - i * 86400000);
         return {
           date: date.toISOString().split('T')[0],
-          dau: Math.floor(Math.random() * 8000) + 5000,
-          wau: Math.floor(Math.random() * 20000) + 15000,
-          mau: Math.floor(Math.random() * 50000) + 40000,
-          newUsers: Math.floor(Math.random() * 1500) + 500,
-          retention7: Math.round((Math.random() * 30 + 30) * 10) / 10,
-          retention30: Math.round((Math.random() * 20 + 15) * 10) / 10,
-          avgSession: Math.round((Math.random() * 15 + 5) * 10) / 10,
-          feature: features[Math.floor(Math.random() * features.length)],
-          usageCount: Math.floor(Math.random() * 5000) + 1000,
+          dau: Math.floor(seededRandom() * 8000) + 5000,
+          wau: Math.floor(seededRandom() * 20000) + 15000,
+          mau: Math.floor(seededRandom() * 50000) + 40000,
+          newUsers: Math.floor(seededRandom() * 1500) + 500,
+          retention7: Math.round(seededRandom() * 300) / 10 + 30,
+          retention30: Math.round(seededRandom() * 200) / 10 + 15,
+          avgSession: Math.round(seededRandom() * 150) / 10 + 5,
+          feature: features[Math.floor(seededRandom() * features.length)],
+          usageCount: Math.floor(seededRandom() * 5000) + 1000,
         };
       });
       break;
@@ -286,14 +294,14 @@ export const generateTableData = (
           : new Date(Date.now() - i * 86400000);
         return {
           date: date.toISOString().split('T')[0],
-          item: items[Math.floor(Math.random() * items.length)],
-          category: categories[Math.floor(Math.random() * categories.length)],
-          income: Math.floor(Math.random() * 500000) + 100000,
-          expense: Math.floor(Math.random() * 200000) + 50000,
-          profit: Math.floor(Math.random() * 300000) + 50000,
-          margin: Math.round((Math.random() * 30 + 10) * 10) / 10,
-          balance: Math.floor(Math.random() * 2000000) + 500000,
-          cashFlow: Math.floor(Math.random() * 500000) - 100000,
+          item: items[Math.floor(seededRandom() * items.length)],
+          category: categories[Math.floor(seededRandom() * categories.length)],
+          income: Math.floor(seededRandom() * 500000) + 100000,
+          expense: Math.floor(seededRandom() * 200000) + 50000,
+          profit: Math.floor(seededRandom() * 300000) + 50000,
+          margin: Math.round(seededRandom() * 300) / 10 + 10,
+          balance: Math.floor(seededRandom() * 2000000) + 500000,
+          cashFlow: Math.floor(seededRandom() * 500000) - 100000,
         };
       });
       break;
@@ -306,16 +314,16 @@ export const generateTableData = (
           ? new Date(endDate.getTime() - i * 86400000)
           : new Date(Date.now() - i * 86400000);
         return {
-          campaign: campaigns[Math.floor(Math.random() * campaigns.length)],
-          channel: channels[Math.floor(Math.random() * channels.length)],
+          campaign: campaigns[Math.floor(seededRandom() * campaigns.length)],
+          channel: channels[Math.floor(seededRandom() * channels.length)],
           date: date.toISOString().split('T')[0],
-          spend: Math.floor(Math.random() * 50000) + 5000,
-          impressions: Math.floor(Math.random() * 100000) + 10000,
-          clicks: Math.floor(Math.random() * 10000) + 1000,
-          leads: Math.floor(Math.random() * 500) + 50,
-          conversions: Math.floor(Math.random() * 100) + 10,
-          cac: Math.round((Math.random() * 200 + 50) * 10) / 10,
-          roi: Math.round((Math.random() * 3 + 0.5) * 100) / 100,
+          spend: Math.floor(seededRandom() * 50000) + 5000,
+          impressions: Math.floor(seededRandom() * 100000) + 10000,
+          clicks: Math.floor(seededRandom() * 10000) + 1000,
+          leads: Math.floor(seededRandom() * 500) + 50,
+          conversions: Math.floor(seededRandom() * 100) + 10,
+          cac: Math.round(seededRandom() * 2000) / 10 + 50,
+          roi: Math.round(seededRandom() * 300) / 100 + 0.5,
         };
       });
       break;
@@ -334,15 +342,15 @@ export const generateTableData = (
         return {
           orderNo: `ORD${String(20260001 + i).padStart(8, '0')}`,
           orderDate: date.toISOString().split('T')[0],
-          customer: customers[Math.floor(Math.random() * customers.length)],
-          product: products[Math.floor(Math.random() * products.length)],
-          category: categories[Math.floor(Math.random() * categories.length)],
-          quantity: Math.floor(Math.random() * 100) + 1,
-          unitPrice: Math.floor(Math.random() * 5000) + 1000,
-          amount: Math.floor(Math.random() * 100000) + 5000,
-          region: regions[Math.floor(Math.random() * regions.length)],
-          salesperson: salespersons[Math.floor(Math.random() * salespersons.length)],
-          status: statuses[Math.floor(Math.random() * statuses.length)],
+          customer: customers[Math.floor(seededRandom() * customers.length)],
+          product: products[Math.floor(seededRandom() * products.length)],
+          category: categories[Math.floor(seededRandom() * categories.length)],
+          quantity: Math.floor(seededRandom() * 100) + 1,
+          unitPrice: Math.floor(seededRandom() * 5000) + 1000,
+          amount: Math.floor(seededRandom() * 100000) + 5000,
+          region: regions[Math.floor(seededRandom() * regions.length)],
+          salesperson: salespersons[Math.floor(seededRandom() * salespersons.length)],
+          status: statuses[Math.floor(seededRandom() * statuses.length)],
         };
       });
       break;

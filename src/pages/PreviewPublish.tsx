@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Eye,
@@ -31,6 +31,14 @@ const periodLabels: Record<PeriodType, string> = {
   weekly: '周报',
   monthly: '月报',
   quarterly: '季报',
+};
+
+const inferPeriodFromName = (name: string): PeriodType => {
+  if (name.includes('日报') || name.includes('每日') || name.includes('daily')) return 'daily';
+  if (name.includes('周报') || name.includes('每周') || name.includes('weekly')) return 'weekly';
+  if (name.includes('月报') || name.includes('每月') || name.includes('monthly')) return 'monthly';
+  if (name.includes('季度') || name.includes('季报') || name.includes('quarterly')) return 'quarterly';
+  return 'weekly';
 };
 
 const frequencyLabels: Record<SubscriptionFrequency, string> = {
@@ -81,6 +89,18 @@ export function PreviewPublish() {
     format: 'pdf' as SubscriptionFormat,
     recipients: [{ name: '', email: '' }],
   });
+
+  useEffect(() => {
+    if (currentReport) {
+      const inferredPeriod = inferPeriodFromName(currentReport.name);
+      setSelectedPeriod(inferredPeriod);
+      const range = getDateRange(inferredPeriod);
+      if (range.start !== currentReport.dataConfig.dateRange.start ||
+          range.end !== currentReport.dataConfig.dateRange.end) {
+        updateDataConfig({ dateRange: range });
+      }
+    }
+  }, [currentReport?.id]);
 
   const handlePeriodChange = (period: PeriodType) => {
     setSelectedPeriod(period);

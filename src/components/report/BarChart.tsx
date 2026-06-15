@@ -33,15 +33,29 @@ export function BarChart({ component, selected, onSelect, dataConfig }: BarChart
   const colors = ['#3b82f6', '#60a5fa', '#1d4ed8', '#10b981', '#34d399', '#059669', '#f59e0b'];
 
   const yAxisKey = useMemo(() => {
-    if (component.config.yAxisKey) return component.config.yAxisKey;
     const dsKeys: Record<string, string> = {
       'ds-sales': 'sales',
       'ds-users': 'usage',
       'ds-finance': 'income',
       'ds-marketing': 'roi',
     };
-    return dsKeys[dataSourceId] || 'value';
-  }, [component.config.yAxisKey, dataSourceId]);
+    const defaultKey = dsKeys[dataSourceId] || 'value';
+
+    if (component.config.yAxisKey) {
+      if (data.length > 0 && data[0][component.config.yAxisKey] !== undefined) {
+        return component.config.yAxisKey;
+      }
+    }
+
+    if (data.length > 0 && data[0][defaultKey] !== undefined) {
+      return defaultKey;
+    }
+
+    const numericKeys = data.length > 0
+      ? Object.keys(data[0]).filter(k => typeof data[0][k] === 'number' && k !== 'value')
+      : [];
+    return numericKeys[0] || defaultKey;
+  }, [component.config.yAxisKey, dataSourceId, data]);
 
   const keyLabels: Record<string, string> = {
     sales: '销售额', value: '数值', usage: '使用量', income: '收入', roi: 'ROI',

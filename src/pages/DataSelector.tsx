@@ -11,11 +11,12 @@ import {
   EyeOff,
   ChevronRight,
   Calendar,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import { useReportStore } from '../store/useReportStore';
 import { dataSources } from '../data/mockData';
 import type { FilterOperator, AggregateType, SortOrder } from '../types';
-
 import { getDateRange } from '../utils/dateUtils';
 
 const operatorLabels: Record<FilterOperator, string> = {
@@ -45,7 +46,7 @@ const sortLabels: Record<SortOrder, string> = {
 
 export function DataSelector() {
   const navigate = useNavigate();
-  const { currentReport, updateDataConfig, switchDataSource, addFilter, removeFilter, updateField } = useReportStore();
+  const { currentReport, updateDataConfig, switchDataSource, addFilter, removeFilter, updateField, moveField } = useReportStore();
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [newFilter, setNewFilter] = useState({ field: '', operator: 'eq' as FilterOperator, value: '' });
 
@@ -259,88 +260,136 @@ export function DataSelector() {
           </div>
 
           <div className="bg-dark-800 rounded-xl border border-dark-700 p-5">
-            <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
-              <ArrowUpDown className="w-5 h-5 text-primary-400" />
-              字段配置
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-white flex items-center gap-2">
+                <ArrowUpDown className="w-5 h-5 text-primary-400" />
+                字段配置
+                <span className="text-xs text-dark-400 font-normal ml-2">
+                  拖拽或使用上下箭头调整排序优先级
+                </span>
+              </h3>
+            </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-dark-700">
+                    <th className="px-4 py-3 text-left font-medium text-dark-300 w-10">顺序</th>
                     <th className="px-4 py-3 text-left font-medium text-dark-300">字段名</th>
                     <th className="px-4 py-3 text-left font-medium text-dark-300">显示名称</th>
                     <th className="px-4 py-3 text-left font-medium text-dark-300">
                       <Calculator className="w-4 h-4 inline mr-1" />
                       汇总方式
                     </th>
-                    <th className="px-4 py-3 text-left font-medium text-dark-300">
+                    <th className="px-4 py-3 text-left font-medium text-dark-300 w-36">
                       <ArrowUpDown className="w-4 h-4 inline mr-1" />
-                      排序
+                      排序与优先级
                     </th>
-                    <th className="px-4 py-3 text-center font-medium text-dark-300">
+                    <th className="px-4 py-3 text-center font-medium text-dark-300 w-20">
                       <Eye className="w-4 h-4 inline mr-1" />
                       显示
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {currentReport.dataConfig.fields.map((field, index) => (
-                    <tr
-                      key={field.id}
-                      className="border-b border-dark-700/50 hover:bg-dark-700/30 transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        <span className="text-white font-medium">{field.fieldName}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="text"
-                          value={field.displayName}
-                          onChange={(e) => updateField(field.id, { displayName: e.target.value })}
-                          className="w-full px-2 py-1 bg-dark-700/50 border border-dark-600 rounded text-white text-sm focus:outline-none focus:border-primary-500"
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <select
-                          value={field.aggregate}
-                          onChange={(e) => updateField(field.id, { aggregate: e.target.value as AggregateType })}
-                          className="px-2 py-1 bg-dark-700/50 border border-dark-600 rounded text-white text-sm focus:outline-none focus:border-primary-500"
-                        >
-                          {(Object.keys(aggregateLabels) as AggregateType[]).map((agg) => (
-                            <option key={agg} value={agg}>
-                              {aggregateLabels[agg]}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-3">
-                        <select
-                          value={field.sortOrder}
-                          onChange={(e) => updateField(field.id, { sortOrder: e.target.value as SortOrder })}
-                          className="px-2 py-1 bg-dark-700/50 border border-dark-600 rounded text-white text-sm focus:outline-none focus:border-primary-500"
-                        >
-                          {(Object.keys(sortLabels) as SortOrder[]).map((sort) => (
-                            <option key={sort} value={sort}>
-                              {sortLabels[sort]}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => updateField(field.id, { visible: !field.visible })}
-                          className={`p-1.5 rounded transition-colors ${
-                            field.visible
-                              ? 'text-green-400 bg-green-500/10 hover:bg-green-500/20'
-                              : 'text-dark-500 bg-dark-700 hover:bg-dark-600'
-                          }`}
-                        >
-                          {field.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {currentReport.dataConfig.fields.map((field, index) => {
+                    const sortFields = currentReport.dataConfig.fields.filter(f => f.sortOrder !== 'none');
+                    const sortPriority = field.sortOrder !== 'none'
+                      ? sortFields.findIndex(f => f.id === field.id) + 1
+                      : null;
+                    const isFirst = index === 0;
+                    const isLast = index === currentReport.dataConfig.fields.length - 1;
+
+                    return (
+                      <tr
+                        key={field.id}
+                        className="border-b border-dark-700/50 hover:bg-dark-700/30 transition-colors"
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => moveField(field.id, 'up')}
+                              disabled={isFirst}
+                              className={`p-1 rounded transition-colors ${
+                                isFirst
+                                  ? 'text-dark-700 cursor-not-allowed'
+                                  : 'text-dark-400 hover:text-white hover:bg-dark-600'
+                              }`}
+                            >
+                              <ChevronUp className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => moveField(field.id, 'down')}
+                              disabled={isLast}
+                              className={`p-1 rounded transition-colors ${
+                                isLast
+                                  ? 'text-dark-700 cursor-not-allowed'
+                                  : 'text-dark-400 hover:text-white hover:bg-dark-600'
+                              }`}
+                            >
+                              <ChevronDown className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-white font-medium">{field.fieldName}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="text"
+                            value={field.displayName}
+                            onChange={(e) => updateField(field.id, { displayName: e.target.value })}
+                            className="w-full px-2 py-1 bg-dark-700/50 border border-dark-600 rounded text-white text-sm focus:outline-none focus:border-primary-500"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={field.aggregate}
+                            onChange={(e) => updateField(field.id, { aggregate: e.target.value as AggregateType })}
+                            className="px-2 py-1 bg-dark-700/50 border border-dark-600 rounded text-white text-sm focus:outline-none focus:border-primary-500"
+                          >
+                            {(Object.keys(aggregateLabels) as AggregateType[]).map((agg) => (
+                              <option key={agg} value={agg}>
+                                {aggregateLabels[agg]}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={field.sortOrder}
+                              onChange={(e) => updateField(field.id, { sortOrder: e.target.value as SortOrder })}
+                              className="px-2 py-1 bg-dark-700/50 border border-dark-600 rounded text-white text-sm focus:outline-none focus:border-primary-500 flex-1"
+                            >
+                              {(Object.keys(sortLabels) as SortOrder[]).map((sort) => (
+                                <option key={sort} value={sort}>
+                                  {sortLabels[sort]}
+                                </option>
+                              ))}
+                            </select>
+                            {sortPriority && (
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center">
+                                {sortPriority}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => updateField(field.id, { visible: !field.visible })}
+                            className={`p-1.5 rounded transition-colors ${
+                              field.visible
+                                ? 'text-green-400 bg-green-500/10 hover:bg-green-500/20'
+                                : 'text-dark-500 bg-dark-700 hover:bg-dark-600'
+                            }`}
+                          >
+                            {field.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

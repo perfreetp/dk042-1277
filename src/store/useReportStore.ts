@@ -78,6 +78,7 @@ interface ReportStore {
   addFilter: (filter: Omit<DataFilter, 'id'>) => void;
   removeFilter: (id: string) => void;
   updateField: (id: string, updates: Partial<FieldConfig>) => void;
+  moveField: (id: string, direction: 'up' | 'down') => void;
   saveReport: () => void;
   saveAsTemplate: (name: string, description: string) => void;
   addSubscription: (subscription: Omit<Subscription, 'id' | 'createdAt' | 'successCount'>) => void;
@@ -302,6 +303,30 @@ export const useReportStore = create<ReportStore>((set, get) => ({
         fields: state.currentReport.dataConfig.fields.map(f =>
           f.id === id ? { ...f, ...updates } : f
         ),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    saveCurrentReport(updated);
+    return { currentReport: updated };
+  }),
+
+  moveField: (id, direction) => set((state) => {
+    if (!state.currentReport) return {};
+
+    const fields = [...state.currentReport.dataConfig.fields];
+    const index = fields.findIndex(f => f.id === id);
+    if (index === -1) return {};
+
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= fields.length) return {};
+
+    [fields[index], fields[newIndex]] = [fields[newIndex], fields[index]];
+
+    const updated = {
+      ...state.currentReport,
+      dataConfig: {
+        ...state.currentReport.dataConfig,
+        fields,
       },
       updatedAt: new Date().toISOString(),
     };

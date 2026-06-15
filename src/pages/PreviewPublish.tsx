@@ -21,6 +21,7 @@ import { LineChart } from '../components/report/LineChart';
 import { BarChart } from '../components/report/BarChart';
 import { TextBlock } from '../components/report/TextBlock';
 import { exportReport } from '../utils/export';
+import { getDateRange } from '../utils/dateUtils';
 import type { SubscriptionFrequency, SubscriptionFormat, ReportComponent } from '../types';
 
 type PeriodType = 'daily' | 'weekly' | 'monthly' | 'quarterly';
@@ -66,6 +67,7 @@ export function PreviewPublish() {
     saveAsTemplate,
     addSubscription,
     updateComponent,
+    updateDataConfig,
   } = useReportStore();
 
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('weekly');
@@ -79,6 +81,12 @@ export function PreviewPublish() {
     format: 'pdf' as SubscriptionFormat,
     recipients: [{ name: '', email: '' }],
   });
+
+  const handlePeriodChange = (period: PeriodType) => {
+    setSelectedPeriod(period);
+    const range = getDateRange(period);
+    updateDataConfig({ dateRange: range });
+  };
 
   if (!currentReport) {
     return (
@@ -100,7 +108,6 @@ export function PreviewPublish() {
     );
   }
 
-  const chartPeriod = selectedPeriod === 'quarterly' ? 'monthly' : selectedPeriod;
   const dataConfig = currentReport.dataConfig;
 
   const renderComponent = (component: ReportComponent) => {
@@ -115,7 +122,7 @@ export function PreviewPublish() {
       case 'table':
         return <ReportTable {...commonProps} />;
       case 'lineChart':
-        return <LineChart {...commonProps} period={chartPeriod} />;
+        return <LineChart {...commonProps} period={selectedPeriod} />;
       case 'barChart':
         return <BarChart {...commonProps} />;
       case 'text':
@@ -230,7 +237,7 @@ export function PreviewPublish() {
                 {(Object.keys(periodLabels) as PeriodType[]).map((period) => (
                   <button
                     key={period}
-                    onClick={() => setSelectedPeriod(period)}
+                    onClick={() => handlePeriodChange(period)}
                     className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                       selectedPeriod === period
                         ? 'bg-primary-600 text-white'

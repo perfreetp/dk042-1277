@@ -154,11 +154,29 @@ export const generateChartData = (
       : Object.keys(aggregated).sort()
     : defaultLabels;
 
-  return keys.map(key => ({
-    name: key,
-    value: aggregated[key]?.value || 0,
-    ...aggregated[key],
-  }));
+  return keys.map(key => {
+    const agg = aggregated[key] || {};
+    const result: Record<string, any> = {
+      name: key,
+      value: agg.value || 0,
+      ...agg,
+    };
+    if (dataSourceId === 'ds-sales') {
+      result.sales = result.amount || result.sales || 0;
+      result.orders = result.quantity || result.orders || 0;
+    }
+    if (dataSourceId === 'ds-users') {
+      result.usage = result.usageCount || result.usage || 0;
+      result.activeUsers = result.dau || result.activeUsers || 0;
+    }
+    if (dataSourceId === 'ds-finance') {
+      result.revenue = result.income || result.revenue || 0;
+    }
+    if (dataSourceId === 'ds-marketing') {
+      result.conversionRate = result.roi || result.conversionRate || 0;
+    }
+    return result;
+  });
 };
 
 export const generateRegionChartData = (

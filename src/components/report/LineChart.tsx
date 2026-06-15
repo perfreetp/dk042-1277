@@ -17,7 +17,7 @@ interface LineChartProps {
   component: ReportComponent;
   selected?: boolean;
   onSelect?: () => void;
-  period?: 'daily' | 'weekly' | 'monthly';
+  period?: 'daily' | 'weekly' | 'monthly' | 'quarterly';
   dataConfig?: Report['dataConfig'];
 }
 
@@ -33,15 +33,28 @@ export function LineChart({ component, selected, onSelect, period = 'weekly', da
   const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   const yAxisKeys = useMemo(() => {
-    if (component.config.yAxisKeys?.length) return component.config.yAxisKeys;
     const dsKeys: Record<string, string[]> = {
-      'ds-sales': ['sales'],
+      'ds-sales': ['sales', 'amount'],
       'ds-users': ['dau', 'newUsers'],
       'ds-finance': ['income', 'expense'],
       'ds-marketing': ['spend', 'conversions'],
     };
-    return dsKeys[dataSourceId] || ['value'];
-  }, [component.config.yAxisKeys, dataSourceId]);
+    const defaultKeys = dsKeys[dataSourceId] || ['value'];
+
+    if (component.config.yAxisKeys?.length) {
+      const existing = component.config.yAxisKeys.filter((key: string) =>
+        data.length > 0 && data[0][key] !== undefined
+      );
+      if (existing.length > 0) return existing;
+    }
+
+    const existingDefaults = defaultKeys.filter(key =>
+      data.length > 0 && data[0][key] !== undefined
+    );
+    if (existingDefaults.length > 0) return existingDefaults;
+
+    return defaultKeys;
+  }, [component.config.yAxisKeys, dataSourceId, data]);
 
   const keyLabels: Record<string, string> = {
     sales: '销售额', orders: '订单数', customers: '客户数', value: '数值',

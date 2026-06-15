@@ -10,6 +10,7 @@ import {
   ArrowRight,
   Edit3,
   Move,
+  Plus,
 } from 'lucide-react';
 import { useReportStore } from '../store/useReportStore';
 import { ReportTable } from '../components/report/ReportTable';
@@ -26,9 +27,22 @@ const componentTypes: { type: ComponentType; label: string; icon: any; descripti
   { type: 'text', label: '说明文字', icon: Type, description: '添加文字说明' },
 ];
 
+const GRID_COLS = 12;
+const ROW_HEIGHT = 80;
+
+const getComponentMinHeight = (type: ComponentType, gridHeight: number): number => {
+  const base = gridHeight * ROW_HEIGHT;
+  switch (type) {
+    case 'table': return Math.max(base, 300);
+    case 'lineChart': return Math.max(base, 280);
+    case 'barChart': return Math.max(base, 280);
+    case 'text': return Math.max(base, 60);
+    default: return base;
+  }
+};
+
 export function ReportEditor() {
   const navigate = useNavigate();
-  const canvasRef = useRef<HTMLDivElement>(null);
   const {
     currentReport,
     selectedComponentId,
@@ -40,11 +54,7 @@ export function ReportEditor() {
     saveReport,
   } = useReportStore();
 
-  const [draggedType, setDraggedType] = useState<ComponentType | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
   const [isEditingName, setIsEditingName] = useState(false);
-  const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
 
   if (!currentReport) {
     return (
@@ -66,62 +76,13 @@ export function ReportEditor() {
     );
   }
 
-  const handleDragStart = (type: ComponentType) => {
-    setDraggedType(type);
-    setIsDragging(true);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedType(null);
-    setIsDragging(false);
-  };
-
-  const handleCanvasDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (!canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    setDragPosition({
-      x: e.clientX - rect.left - 150,
-      y: e.clientY - rect.top - 50,
-    });
-  };
-
-  const handleCanvasDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (!draggedType || !canvasRef.current) return;
-
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left - 150;
-    const y = e.clientY - rect.top - 50;
-
-    addComponent(draggedType, {
-      x: Math.max(0, x),
-      y: Math.max(0, y),
-      width: 400,
-      height: 300,
-    });
-
-    handleDragEnd();
-  };
-
-  const handleComponentDragStart = (e: React.DragEvent, component: ReportComponent) => {
-    e.stopPropagation();
-    setEditingComponentId(component.id);
-    selectComponent(component.id);
-  };
-
-  const handleComponentDrag = (e: React.DragEvent, component: ReportComponent) => {
-    if (!canvasRef.current || !isDragging) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left - 150;
-    const y = e.clientY - rect.top - 50;
-
-    updateComponent(component.id, {
-      position: {
-        ...component.position,
-        x: Math.max(0, x),
-        y: Math.max(0, y),
-      },
+  const handleAddComponent = (type: ComponentType) => {
+    const isFullWidth = type === 'table' || type === 'text';
+    addComponent(type, {
+      x: 0,
+      y: 0,
+      width: isFullWidth ? GRID_COLS : 6,
+      height: type === 'text' ? 1 : 4,
     });
   };
 
@@ -131,6 +92,7 @@ export function ReportEditor() {
       component,
       selected: isSelected,
       onSelect: () => selectComponent(component.id),
+      dataConfig: currentReport.dataConfig,
     };
 
     switch (component.type) {
@@ -141,28 +103,33 @@ export function ReportEditor() {
       case 'barChart':
         return <BarChart {...commonProps} />;
       case 'text':
-        return <TextBlock {...commonProps} />;
+        return (
+          <TextBlock
+            {...commonProps}
+            editable={true}
+            onUpdate={(id, updates) => updateComponent(id, updates)}
+          />
+        );
       default:
         return null;
     }
   };
 
+  const sortedComponents = [...currentReport.components].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
   const selectedComponent = currentReport.components.find(c => c.id === selectedComponentId);
 
   return (
     <div className="flex h-[calc(100vh-10rem)] animate-fade-in">
-      <div className="w-64 flex-shrink-0 bg-dark-800 rounded-xl border border-dark-700 p-4 mr-6">
+      <div className="w-64 flex-shrink-0 bg-dark-800 rounded-xl border border-dark-700 p-4 mr-6 flex flex-col">
         <h3 className="font-semibold text-white mb-4">组件库</h3>
         <div className="space-y-3">
           {componentTypes.map((item) => {
             const Icon = item.icon;
             return (
-              <div
+              <button
                 key={item.type}
-                draggable
-                onDragStart={() => handleDragStart(item.type)}
-                onDragEnd={handleDragEnd}
-                className="group relative p-4 bg-dark-700/50 rounded-lg cursor-grab active:cursor-grabbing hover:bg-dark-700 transition-all duration-200 border border-transparent hover:border-primary-500/30"
+                onClick={() => handleAddComponent(item.type)}
+                className="w-full group relative p-4 bg-dark-700/50 rounded-lg cursor-pointer hover:bg-dark-700 transition-all duration-200 border border-transparent hover:border-primary-500/30 text-left"
               >
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 rounded-lg bg-primary-500/20 flex items-center justify-center flex-shrink-0">
@@ -173,13 +140,13 @@ export function ReportEditor() {
                     <p className="text-xs text-dark-400 mt-0.5">{item.description}</p>
                   </div>
                 </div>
-                <Move className="absolute top-3 right-3 w-4 h-4 text-dark-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
+                <Plus className="absolute top-3 right-3 w-4 h-4 text-dark-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
             );
           })}
         </div>
 
-        <div className="mt-6 pt-6 border-t border-dark-700">
+        <div className="mt-auto pt-6 border-t border-dark-700">
           <button
             onClick={saveReport}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors mb-3"
@@ -197,7 +164,7 @@ export function ReportEditor() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             {isEditingName ? (
@@ -225,62 +192,51 @@ export function ReportEditor() {
         </div>
 
         <div
-          ref={canvasRef}
-          onDragOver={handleCanvasDragOver}
-          onDrop={handleCanvasDrop}
-          onClick={() => selectComponent(null)}
-          className={`flex-1 relative rounded-xl border-2 border-dashed overflow-auto grid-bg transition-colors ${
-            isDragging ? 'border-primary-500 bg-primary-500/5' : 'border-dark-600'
-          }`}
-          style={{ minHeight: '600px' }}
+          className="flex-1 rounded-xl border-2 border-dashed border-dark-600 overflow-auto grid-bg p-4"
         >
-          {isDragging && draggedType && (
-            <div
-              className="absolute pointer-events-none opacity-50"
-              style={{
-                left: dragPosition.x,
-                top: dragPosition.y,
-                width: 400,
-                height: 300,
-              }}
-            >
-              <div className="w-full h-full bg-primary-500/20 border-2 border-dashed border-primary-500 rounded-lg flex items-center justify-center">
-                <span className="text-primary-400 text-sm">
-                  放置 {getComponentTypeLabel(draggedType)}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {currentReport.components.length === 0 && !isDragging && (
-            <div className="absolute inset-0 flex items-center justify-center">
+          {currentReport.components.length === 0 && (
+            <div className="flex items-center justify-center h-full min-h-[400px]">
               <div className="text-center">
                 <div className="w-20 h-20 rounded-full bg-dark-800 flex items-center justify-center mx-auto mb-4">
                   <Move className="w-10 h-10 text-dark-500" />
                 </div>
-                <h3 className="text-lg font-medium text-white mb-2">拖拽组件到此处</h3>
-                <p className="text-dark-400 text-sm">从左侧组件库拖拽组件开始设计报表</p>
+                <h3 className="text-lg font-medium text-white mb-2">点击左侧组件添加到报表</h3>
+                <p className="text-dark-400 text-sm">选择组件类型开始设计报表</p>
               </div>
             </div>
           )}
 
-          {currentReport.components.map((component) => (
-            <div
-              key={component.id}
-              draggable
-              onDragStart={(e) => handleComponentDragStart(e, component)}
-              onDrag={(e) => handleComponentDrag(e, component)}
-              className="absolute animate-fade-in"
-              style={{
-                left: component.position.x,
-                top: component.position.y,
-                width: component.position.width,
-                height: component.position.height,
-              }}
-            >
-              {renderComponent(component)}
-            </div>
-          ))}
+          <div
+            className="grid gap-4"
+            style={{
+              gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+            }}
+          >
+            {sortedComponents.map((component) => {
+              const colSpan = Math.min(component.position.width, GRID_COLS);
+              const minHeight = getComponentMinHeight(component.type, component.position.height);
+              const isSelected = selectedComponentId === component.id;
+
+              return (
+                <div
+                  key={component.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    selectComponent(component.id);
+                  }}
+                  className={`animate-fade-in rounded-lg transition-all duration-200 cursor-pointer ${
+                    isSelected ? 'ring-2 ring-primary-500 ring-offset-2 ring-offset-dark-900' : 'hover:ring-1 hover:ring-dark-500'
+                  }`}
+                  style={{
+                    gridColumn: `span ${colSpan} / span ${colSpan}`,
+                    minHeight,
+                  }}
+                >
+                  {renderComponent(component)}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -296,11 +252,23 @@ export function ReportEditor() {
                   {getComponentTypeLabel(selectedComponent.type)}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-dark-300">位置</span>
-                <span className="text-sm text-dark-400">
-                  {selectedComponent.position.x}, {selectedComponent.position.y}
-                </span>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-dark-300">宽度</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={3}
+                    max={12}
+                    value={selectedComponent.position.width}
+                    onChange={(e) =>
+                      updateComponent(selectedComponent.id, {
+                        position: { ...selectedComponent.position, width: parseInt(e.target.value) }
+                      })
+                    }
+                    className="w-24 accent-primary-500"
+                  />
+                  <span className="text-sm text-dark-400 w-8 text-right">{selectedComponent.position.width}/12</span>
+                </div>
               </div>
             </div>
 
@@ -322,6 +290,20 @@ export function ReportEditor() {
             {selectedComponent.type === 'text' && (
               <>
                 <div>
+                  <label className="block text-sm text-dark-300 mb-2">文字内容</label>
+                  <textarea
+                    value={selectedComponent.config.content || ''}
+                    onChange={(e) =>
+                      updateComponent(selectedComponent.id, {
+                        config: { ...selectedComponent.config, content: e.target.value }
+                      })
+                    }
+                    rows={3}
+                    className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500 resize-none"
+                    placeholder="输入文字内容"
+                  />
+                </div>
+                <div>
                   <label className="block text-sm text-dark-300 mb-2">字体大小</label>
                   <select
                     value={selectedComponent.config.fontSize || '16px'}
@@ -339,6 +321,7 @@ export function ReportEditor() {
                     <option value="20px">20px</option>
                     <option value="24px">24px</option>
                     <option value="28px">28px</option>
+                    <option value="32px">32px</option>
                   </select>
                 </div>
                 <div>

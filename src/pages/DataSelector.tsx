@@ -43,7 +43,7 @@ const sortLabels: Record<SortOrder, string> = {
 
 export function DataSelector() {
   const navigate = useNavigate();
-  const { currentReport, updateDataConfig, addFilter, removeFilter, updateField } = useReportStore();
+  const { currentReport, updateDataConfig, switchDataSource, addFilter, removeFilter, updateField } = useReportStore();
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [newFilter, setNewFilter] = useState({ field: '', operator: 'eq' as FilterOperator, value: '' });
 
@@ -118,7 +118,7 @@ export function DataSelector() {
               {dataSources.map((ds) => (
                 <div
                   key={ds.id}
-                  onClick={() => updateDataConfig({ dataSource: ds.id })}
+                  onClick={() => switchDataSource(ds.id)}
                   className={`p-4 rounded-lg cursor-pointer transition-all duration-200 border ${
                     currentReport.dataConfig.dataSource === ds.id
                       ? 'bg-primary-600/10 border-primary-500/30'

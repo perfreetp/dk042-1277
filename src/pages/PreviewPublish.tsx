@@ -20,7 +20,7 @@ import { ReportTable } from '../components/report/ReportTable';
 import { LineChart } from '../components/report/LineChart';
 import { BarChart } from '../components/report/BarChart';
 import { TextBlock } from '../components/report/TextBlock';
-import { exportReport, getExportFormatLabel } from '../utils/export';
+import { exportReport } from '../utils/export';
 import type { SubscriptionFrequency, SubscriptionFormat, ReportComponent } from '../types';
 
 type PeriodType = 'daily' | 'weekly' | 'monthly' | 'quarterly';
@@ -44,6 +44,20 @@ const formatLabels: Record<SubscriptionFormat, string> = {
   png: 'PNG',
 };
 
+const GRID_COLS = 12;
+const ROW_HEIGHT = 80;
+
+const getComponentMinHeight = (type: ReportComponent['type'], gridHeight: number): number => {
+  const base = gridHeight * ROW_HEIGHT;
+  switch (type) {
+    case 'table': return Math.max(base, 300);
+    case 'lineChart': return Math.max(base, 280);
+    case 'barChart': return Math.max(base, 280);
+    case 'text': return Math.max(base, 60);
+    default: return base;
+  }
+};
+
 export function PreviewPublish() {
   const navigate = useNavigate();
   const {
@@ -51,6 +65,7 @@ export function PreviewPublish() {
     saveReport,
     saveAsTemplate,
     addSubscription,
+    updateComponent,
   } = useReportStore();
 
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('weekly');
@@ -85,25 +100,26 @@ export function PreviewPublish() {
     );
   }
 
+  const chartPeriod = selectedPeriod === 'quarterly' ? 'monthly' : selectedPeriod;
+  const dataConfig = currentReport.dataConfig;
+
   const renderComponent = (component: ReportComponent) => {
     const commonProps = {
       component,
       selected: false,
       onSelect: () => {},
-      editable: false,
+      dataConfig,
     };
-
-    if (component.type === 'lineChart') {
-      return <LineChart {...commonProps} period={selectedPeriod === 'quarterly' ? 'monthly' : selectedPeriod} />;
-    }
 
     switch (component.type) {
       case 'table':
         return <ReportTable {...commonProps} />;
+      case 'lineChart':
+        return <LineChart {...commonProps} period={chartPeriod} />;
       case 'barChart':
         return <BarChart {...commonProps} />;
       case 'text':
-        return <TextBlock {...commonProps} />;
+        return <TextBlock {...commonProps} editable={false} />;
       default:
         return null;
     }
@@ -169,6 +185,8 @@ export function PreviewPublish() {
     setSubscriptionConfig({ ...subscriptionConfig, recipients: newRecipients });
   };
 
+  const sortedComponents = [...currentReport.components].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
+
   return (
     <div className="animate-fade-in">
       <div className="mb-6">
@@ -226,43 +244,51 @@ export function PreviewPublish() {
             </div>
           </div>
 
-          <div className="bg-dark-800 rounded-xl border border-dark-700 p-6 min-h-[600px]">
+          <div className="bg-dark-800 rounded-xl border border-dark-700 p-6">
             <div className="mb-6 pb-4 border-b border-dark-700">
               <h2 className="font-display text-2xl font-bold text-white">
                 {currentReport.name}
               </h2>
               <p className="text-dark-400 text-sm mt-1">
-                {periodLabels[selectedPeriod]} · {currentReport.dataConfig.dateRange.start} 至 {currentReport.dataConfig.dateRange.end}
+                {periodLabels[selectedPeriod]} · {dataConfig.dateRange.start} 至 {dataConfig.dateRange.end}
               </p>
             </div>
 
-            <div className="relative" style={{ minHeight: '500px' }}>
-              {currentReport.components.map((component) => (
-                <div
-                  key={component.id}
-                  className="absolute animate-fade-in"
-                  style={{
-                    left: component.position.x * 0.8,
-                    top: component.position.y * 0.8,
-                    width: component.position.width * 0.8,
-                    height: component.position.height * 0.8,
-                  }}
-                >
-                  {renderComponent(component)}
-                </div>
-              ))}
-
-              {currentReport.components.length === 0 && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="w-16 h-16 rounded-full bg-dark-700/50 flex items-center justify-center mx-auto mb-3">
-                      <Eye className="w-8 h-8 text-dark-500" />
-                    </div>
-                    <p className="text-dark-400 text-sm">报表暂无组件，请先在编辑器中添加</p>
+            {currentReport.components.length === 0 ? (
+              <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-full bg-dark-700/50 flex items-center justify-center mx-auto mb-3">
+                    <Eye className="w-8 h-8 text-dark-500" />
                   </div>
+                  <p className="text-dark-400 text-sm">报表暂无组件，请先在编辑器中添加</p>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div
+                className="grid gap-4"
+                style={{
+                  gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+                }}
+              >
+                {sortedComponents.map((component) => {
+                  const colSpan = Math.min(component.position.width, GRID_COLS);
+                  const minHeight = getComponentMinHeight(component.type, component.position.height);
+
+                  return (
+                    <div
+                      key={component.id}
+                      className="animate-fade-in rounded-lg"
+                      style={{
+                        gridColumn: `span ${colSpan} / span ${colSpan}`,
+                        minHeight,
+                      }}
+                    >
+                      {renderComponent(component)}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -372,12 +398,16 @@ export function PreviewPublish() {
                 <span className="text-white">{currentReport.components.length}</span>
               </div>
               <div className="flex justify-between">
+                <span className="text-dark-400">数据源</span>
+                <span className="text-white">{dataConfig.dataSource.replace('ds-', '')}</span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-dark-400">筛选条件</span>
-                <span className="text-white">{currentReport.dataConfig.filters.length} 个</span>
+                <span className="text-white">{dataConfig.filters.length} 个</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-dark-400">数据字段</span>
-                <span className="text-white">{currentReport.dataConfig.fields.filter(f => f.visible).length} 个</span>
+                <span className="text-white">{dataConfig.fields.filter(f => f.visible).length} 个可见</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-dark-400">状态</span>

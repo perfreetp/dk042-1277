@@ -11,9 +11,49 @@ import type {
   Position,
 } from '../types';
 import { allTemplates } from '../data/templates';
-import { subscriptions as mockSubscriptions, generationLogs as mockLogs, defaultFields } from '../data/mockData';
+import { subscriptions as mockSubscriptions, generationLogs as mockLogs, defaultFields, getFieldsForDataSource } from '../data/mockData';
 import { createDefaultComponent, generateId } from '../utils/dragUtils';
 import { getDateRange } from '../utils/dateUtils';
+
+const STORAGE_KEYS = {
+  TEMPLATES: 'report_gen_team_templates',
+  REPORT: 'report_gen_current_report',
+  SUBSCRIPTIONS: 'report_gen_subscriptions',
+};
+
+const loadTeamTemplates = (): ReportTemplate[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveTeamTemplates = (templates: ReportTemplate[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(templates));
+  } catch { }
+};
+
+const loadCurrentReport = (): Report | null => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.REPORT);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+};
+
+const saveCurrentReport = (report: Report | null) => {
+  try {
+    if (report) {
+      localStorage.setItem(STORAGE_KEYS.REPORT, JSON.stringify(report));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.REPORT);
+    }
+  } catch { }
+};
 
 interface ReportStore {
   templates: ReportTemplate[];
@@ -34,6 +74,7 @@ interface ReportStore {
   removeComponent: (id: string) => void;
   selectComponent: (id: string | null) => void;
   updateDataConfig: (config: Partial<Report['dataConfig']>) => void;
+  switchDataSource: (dataSourceId: string) => void;
   addFilter: (filter: Omit<DataFilter, 'id'>) => void;
   removeFilter: (id: string) => void;
   updateField: (id: string, updates: Partial<FieldConfig>) => void;
@@ -46,28 +87,13 @@ interface ReportStore {
   setNotification: (notification: { type: 'success' | 'error' | 'info'; message: string } | null) => void;
 }
 
-const createInitialReport = (): Report => {
-  const dateRange = getDateRange('weekly');
-  return {
-    id: generateId(),
-    name: '未命名报表',
-    components: [],
-    dataConfig: {
-      dataSource: 'ds-sales',
-      filters: [],
-      fields: [...defaultFields],
-      dateRange,
-    },
-    status: 'draft',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-};
+const systemTemplates = allTemplates.filter(t => t.isSystem);
+const initialTeamTemplates = loadTeamTemplates();
 
 export const useReportStore = create<ReportStore>((set, get) => ({
-  templates: allTemplates,
+  templates: [...systemTemplates, ...initialTeamTemplates],
   currentTemplate: null,
-  currentReport: null,
+  currentReport: loadCurrentReport(),
   selectedComponentId: null,
   subscriptions: mockSubscriptions,
   generationLogs: mockLogs,
@@ -82,11 +108,44 @@ export const useReportStore = create<ReportStore>((set, get) => ({
     }
 
     const dateRange = getDateRange('weekly');
+    const dataSource = template.dataConfig?.dataSource || 'ds-sales';
+    const fields = template.dataConfig?.fields
+      ? template.dataConfig.fields.map(f => ({ ...f, id: generateId() }))
+      : getFieldsForDataSource(dataSource);
+
     const report: Report = {
       id: generateId(),
       name: template.name,
       templateId: template.id,
-      components: template.components.map(c => ({ ...c, id: generateId() })),
+      components: template.components.map(c => ({
+        ...c,
+        id: generateId(),
+        config: { ...c.config },
+        style: { ...c.style },
+        position: { ...c.position },
+      })),
+      dataConfig: {
+        dataSource,
+        filters: [],
+        fields,
+        dateRange,
+      },
+      status: 'draft',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    saveCurrentReport(report);
+    set({ currentReport: report, currentTemplate: template });
+    return report;
+  },
+
+  createBlankReport: () => {
+    const dateRange = getDateRange('weekly');
+    const report: Report = {
+      id: generateId(),
+      name: '未命名报表',
+      components: [],
       dataConfig: {
         dataSource: 'ds-sales',
         filters: [],
@@ -98,34 +157,35 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       updatedAt: new Date().toISOString(),
     };
 
-    set({ currentReport: report, currentTemplate: template });
-    return report;
-  },
-
-  createBlankReport: () => {
-    const report = createInitialReport();
+    saveCurrentReport(report);
     set({ currentReport: report, currentTemplate: null });
     return report;
   },
 
-  setCurrentReport: (report) => set({ currentReport: report }),
+  setCurrentReport: (report) => {
+    saveCurrentReport(report);
+    set({ currentReport: report });
+  },
 
-  updateReportName: (name) => set((state) => ({
-    currentReport: state.currentReport
-      ? { ...state.currentReport, name, updatedAt: new Date().toISOString() }
-      : null,
-  })),
+  updateReportName: (name) => set((state) => {
+    if (!state.currentReport) return {};
+    const updated = { ...state.currentReport, name, updatedAt: new Date().toISOString() };
+    saveCurrentReport(updated);
+    return { currentReport: updated };
+  }),
 
   addComponent: (type, position) => set((state) => {
     if (!state.currentReport) return {};
 
     const newComponent = createDefaultComponent(type, position);
+    const updated = {
+      ...state.currentReport,
+      components: [...state.currentReport.components, newComponent],
+      updatedAt: new Date().toISOString(),
+    };
+    saveCurrentReport(updated);
     return {
-      currentReport: {
-        ...state.currentReport,
-        components: [...state.currentReport.components, newComponent],
-        updatedAt: new Date().toISOString(),
-      },
+      currentReport: updated,
       selectedComponentId: newComponent.id,
     };
   }),
@@ -133,26 +193,28 @@ export const useReportStore = create<ReportStore>((set, get) => ({
   updateComponent: (id, updates) => set((state) => {
     if (!state.currentReport) return {};
 
-    return {
-      currentReport: {
-        ...state.currentReport,
-        components: state.currentReport.components.map(c =>
-          c.id === id ? { ...c, ...updates } : c
-        ),
-        updatedAt: new Date().toISOString(),
-      },
+    const updated = {
+      ...state.currentReport,
+      components: state.currentReport.components.map(c =>
+        c.id === id ? { ...c, ...updates } : c
+      ),
+      updatedAt: new Date().toISOString(),
     };
+    saveCurrentReport(updated);
+    return { currentReport: updated };
   }),
 
   removeComponent: (id) => set((state) => {
     if (!state.currentReport) return {};
 
+    const updated = {
+      ...state.currentReport,
+      components: state.currentReport.components.filter(c => c.id !== id),
+      updatedAt: new Date().toISOString(),
+    };
+    saveCurrentReport(updated);
     return {
-      currentReport: {
-        ...state.currentReport,
-        components: state.currentReport.components.filter(c => c.id !== id),
-        updatedAt: new Date().toISOString(),
-      },
+      currentReport: updated,
       selectedComponentId: state.selectedComponentId === id ? null : state.selectedComponentId,
     };
   }),
@@ -162,83 +224,92 @@ export const useReportStore = create<ReportStore>((set, get) => ({
   updateDataConfig: (config) => set((state) => {
     if (!state.currentReport) return {};
 
-    return {
-      currentReport: {
-        ...state.currentReport,
-        dataConfig: { ...state.currentReport.dataConfig, ...config },
-        updatedAt: new Date().toISOString(),
-      },
+    const updated = {
+      ...state.currentReport,
+      dataConfig: { ...state.currentReport.dataConfig, ...config },
+      updatedAt: new Date().toISOString(),
     };
+    saveCurrentReport(updated);
+    return { currentReport: updated };
+  }),
+
+  switchDataSource: (dataSourceId) => set((state) => {
+    if (!state.currentReport) return {};
+
+    const newFields = getFieldsForDataSource(dataSourceId);
+    const updated = {
+      ...state.currentReport,
+      dataConfig: {
+        ...state.currentReport.dataConfig,
+        dataSource: dataSourceId,
+        filters: [],
+        fields: newFields,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    saveCurrentReport(updated);
+    return { currentReport: updated };
   }),
 
   addFilter: (filter) => set((state) => {
     if (!state.currentReport) return {};
 
     const newFilter: DataFilter = { ...filter, id: generateId() };
-    return {
-      currentReport: {
-        ...state.currentReport,
-        dataConfig: {
-          ...state.currentReport.dataConfig,
-          filters: [...state.currentReport.dataConfig.filters, newFilter],
-        },
-        updatedAt: new Date().toISOString(),
+    const updated = {
+      ...state.currentReport,
+      dataConfig: {
+        ...state.currentReport.dataConfig,
+        filters: [...state.currentReport.dataConfig.filters, newFilter],
       },
+      updatedAt: new Date().toISOString(),
     };
+    saveCurrentReport(updated);
+    return { currentReport: updated };
   }),
 
   removeFilter: (id) => set((state) => {
     if (!state.currentReport) return {};
 
-    return {
-      currentReport: {
-        ...state.currentReport,
-        dataConfig: {
-          ...state.currentReport.dataConfig,
-          filters: state.currentReport.dataConfig.filters.filter(f => f.id !== id),
-        },
-        updatedAt: new Date().toISOString(),
+    const updated = {
+      ...state.currentReport,
+      dataConfig: {
+        ...state.currentReport.dataConfig,
+        filters: state.currentReport.dataConfig.filters.filter(f => f.id !== id),
       },
+      updatedAt: new Date().toISOString(),
     };
+    saveCurrentReport(updated);
+    return { currentReport: updated };
   }),
 
   updateField: (id, updates) => set((state) => {
     if (!state.currentReport) return {};
 
-    return {
-      currentReport: {
-        ...state.currentReport,
-        dataConfig: {
-          ...state.currentReport.dataConfig,
-          fields: state.currentReport.dataConfig.fields.map(f =>
-            f.id === id ? { ...f, ...updates } : f
-          ),
-        },
-        updatedAt: new Date().toISOString(),
+    const updated = {
+      ...state.currentReport,
+      dataConfig: {
+        ...state.currentReport.dataConfig,
+        fields: state.currentReport.dataConfig.fields.map(f =>
+          f.id === id ? { ...f, ...updates } : f
+        ),
       },
+      updatedAt: new Date().toISOString(),
     };
+    saveCurrentReport(updated);
+    return { currentReport: updated };
   }),
 
   saveReport: () => {
     const { currentReport } = get();
     if (!currentReport) return;
 
-    try {
-      localStorage.setItem(`report_${currentReport.id}`, JSON.stringify(currentReport));
-      set({
-        notification: { type: 'success', message: '报表保存成功' },
-      });
-    } catch (error) {
-      set({
-        notification: { type: 'error', message: '保存失败，请重试' },
-      });
-    }
-
+    saveCurrentReport(currentReport);
+    set({ notification: { type: 'success', message: '报表保存成功' } });
     setTimeout(() => set({ notification: null }), 3000);
   },
 
   saveAsTemplate: (name, description) => {
-    const { currentReport } = get();
+    const { currentReport, templates } = get();
     if (!currentReport) return;
 
     const newTemplate: ReportTemplate = {
@@ -246,16 +317,26 @@ export const useReportStore = create<ReportStore>((set, get) => ({
       name,
       description,
       category: 'sales',
-      thumbnail: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=data%20report%20template%20preview%20dark%20theme&image_size=square',
-      components: currentReport.components,
+      thumbnail: '',
+      components: currentReport.components.map(c => ({
+        ...c,
+        id: generateId(),
+        config: { ...c.config },
+        style: { ...c.style },
+        position: { ...c.position },
+      })),
+      dataConfig: { ...currentReport.dataConfig },
       isSystem: false,
       useCount: 0,
       createdAt: new Date().toISOString(),
     };
 
+    const teamTemplates = templates.filter(t => !t.isSystem);
+    saveTeamTemplates([...teamTemplates, newTemplate]);
+
     set((state) => ({
       templates: [...state.templates, newTemplate],
-      notification: { type: 'success', message: '模板保存成功' },
+      notification: { type: 'success', message: '模板保存成功，刷新后仍可查看' },
     }));
 
     setTimeout(() => set({ notification: null }), 3000);

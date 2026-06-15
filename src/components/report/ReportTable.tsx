@@ -1,48 +1,93 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Settings } from 'lucide-react';
-import { generateTableData } from '../../data/mockData';
-import type { ReportComponent } from '../../types';
+import { generateTableData, getFieldLabel } from '../../data/mockData';
+import type { ReportComponent, Report, FieldConfig } from '../../types';
 
 interface ReportTableProps {
   component: ReportComponent;
   selected?: boolean;
   onSelect?: () => void;
+  dataConfig?: Report['dataConfig'];
 }
 
-export function ReportTable({ component, selected, onSelect }: ReportTableProps) {
+export function ReportTable({ component, selected, onSelect, dataConfig }: ReportTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = component.config.pageSize || 10;
-  const data = generateTableData(50);
-  const columns = component.config.columns?.length
-    ? component.config.columns
-    : ['orderNo', 'orderDate', 'customer', 'product', 'amount', 'status'];
 
+  const dataSourceId = dataConfig?.dataSource || 'ds-sales';
+  const filters = dataConfig?.filters || [];
+  const fields = dataConfig?.fields;
+
+  const data = useMemo(
+    () => generateTableData(dataSourceId, 30, filters, fields),
+    [dataSourceId, filters, fields]
+  );
+
+  const visibleFields = useMemo(() => {
+    if (fields && fields.length > 0) {
+      const vf = fields.filter(f => f.visible);
+      if (vf.length > 0) return vf;
+    }
+    if (component.config.columns?.length) {
+      return component.config.columns.map((col: string, i: number) => ({
+        id: `col-${i}`,
+        fieldName: col,
+        displayName: getFieldLabel(col, dataSourceId),
+        aggregate: 'none' as const,
+        sortOrder: 'none' as const,
+        visible: true,
+      }));
+    }
+    const dsDefaults: Record<string, string[]> = {
+      'ds-sales': ['orderNo', 'orderDate', 'customer', 'product', 'amount', 'status'],
+      'ds-users': ['date', 'dau', 'newUsers', 'retention7', 'feature', 'usageCount'],
+      'ds-finance': ['date', 'item', 'category', 'income', 'expense', 'profit'],
+      'ds-marketing': ['campaign', 'channel', 'spend', 'leads', 'conversions', 'roi'],
+    };
+    return (dsDefaults[dataSourceId] || dsDefaults['ds-sales']).map((col, i) => ({
+      id: `col-${i}`,
+      fieldName: col,
+      displayName: getFieldLabel(col, dataSourceId),
+      aggregate: 'none' as const,
+      sortOrder: 'none' as const,
+      visible: true,
+    }));
+  }, [fields, component.config.columns, dataSourceId]);
+
+  const columns = visibleFields.map(f => f.fieldName);
   const totalPages = Math.ceil(data.length / pageSize);
   const paginatedData = data.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case '已完成':
-        return 'text-green-400 bg-green-500/10';
-      case '处理中':
-        return 'text-yellow-400 bg-yellow-500/10';
-      case '待付款':
-        return 'text-blue-400 bg-blue-500/10';
-      case '已取消':
-        return 'text-red-400 bg-red-500/10';
-      default:
-        return 'text-dark-400 bg-dark-700/50';
+      case '已完成': return 'text-green-400 bg-green-500/10';
+      case '处理中': return 'text-yellow-400 bg-yellow-500/10';
+      case '待付款': return 'text-blue-400 bg-blue-500/10';
+      case '已取消': return 'text-red-400 bg-red-500/10';
+      default: return 'text-dark-400 bg-dark-700/50';
     }
   };
 
   const formatValue = (key: string, value: any) => {
-    if (key === 'amount') {
+    if (['amount', 'unitPrice', 'income', 'expense', 'profit', 'balance', 'cashFlow', 'spend', 'cac'].includes(key)) {
       return `¥${Number(value).toLocaleString()}`;
     }
-    if (key === 'unitPrice') {
-      return `¥${Number(value).toLocaleString()}`;
+    if (['roi'].includes(key)) {
+      return `${value}x`;
+    }
+    if (['margin', 'retention7', 'retention30'].includes(key)) {
+      return `${value}%`;
+    }
+    if (['avgSession'].includes(key)) {
+      return `${value}min`;
     }
     return value;
+  };
+
+  const getColumnLabel = (fieldName: string) => {
+    const vf = visibleFields.find(f => f.fieldName === fieldName);
+    if (vf && vf.displayName && vf.displayName !== vf.fieldName) return vf.displayName;
+    return getFieldLabel(fieldName, dataSourceId);
   };
 
   return (
@@ -56,41 +101,31 @@ export function ReportTable({ component, selected, onSelect }: ReportTableProps)
       {component.config.title && (
         <div className="px-4 py-3 border-b border-dark-700 flex items-center justify-between">
           <h3 className="font-semibold text-white">{component.config.title}</h3>
-          <button
-            onClick={(e) => e.stopPropagation()}
-            className="p-1.5 text-dark-400 hover:text-white hover:bg-dark-700/50 rounded transition-colors"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
+          {selected && (
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="p-1.5 text-dark-400 hover:text-white hover:bg-dark-700/50 rounded transition-colors"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          )}
         </div>
       )}
 
       <div className="overflow-auto" style={{ height: component.config.title ? 'calc(100% - 52px)' : '100%' }}>
         <table className="w-full text-sm">
-          {component.config.showHeader !== false && (
-            <thead className="bg-dark-700/50 sticky top-0">
-              <tr>
-                {columns.map((col: string) => (
-                  <th
-                    key={col}
-                    className="px-4 py-3 text-left font-medium text-dark-300 whitespace-nowrap"
-                  >
-                    {col === 'orderNo' && '订单号'}
-                    {col === 'orderDate' && '日期'}
-                    {col === 'customer' && '客户'}
-                    {col === 'product' && '产品'}
-                    {col === 'category' && '分类'}
-                    {col === 'quantity' && '数量'}
-                    {col === 'amount' && '金额'}
-                    {col === 'region' && '区域'}
-                    {col === 'status' && '状态'}
-                    {col === 'salesperson' && '销售'}
-                    {col === 'unitPrice' && '单价'}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-          )}
+          <thead className="bg-dark-700/50 sticky top-0">
+            <tr>
+              {columns.map((col: string) => (
+                <th
+                  key={col}
+                  className="px-4 py-3 text-left font-medium text-dark-300 whitespace-nowrap"
+                >
+                  {getColumnLabel(col)}
+                </th>
+              ))}
+            </tr>
+          </thead>
           <tbody>
             {paginatedData.map((row, index) => (
               <tr

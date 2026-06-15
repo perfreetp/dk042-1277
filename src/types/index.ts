@@ -54,6 +54,7 @@ export interface ReportTemplate {
   category: TemplateCategory;
   thumbnail: string;
   components: ReportComponent[];
+  dataConfig?: Report['dataConfig'];
   isSystem: boolean;
   useCount: number;
   createdAt: string;

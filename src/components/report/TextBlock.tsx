@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Settings, Type } from 'lucide-react';
 import type { ReportComponent } from '../../types';
 
@@ -7,11 +7,20 @@ interface TextBlockProps {
   selected?: boolean;
   onSelect?: () => void;
   editable?: boolean;
+  onUpdate?: (id: string, updates: Partial<ReportComponent>) => void;
 }
 
-export function TextBlock({ component, selected, onSelect, editable = true }: TextBlockProps) {
+export function TextBlock({ component, selected, onSelect, editable = true, onUpdate }: TextBlockProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [content, setContent] = useState(component.config.content || '请输入说明文字');
+  const content = component.config.content || '请输入说明文字';
+
+  const handleContentChange = useCallback((newContent: string) => {
+    if (onUpdate) {
+      onUpdate(component.id, {
+        config: { ...component.config, content: newContent },
+      });
+    }
+  }, [component.id, component.config, onUpdate]);
 
   const handleBlur = () => {
     setIsEditing(false);
@@ -47,7 +56,7 @@ export function TextBlock({ component, selected, onSelect, editable = true }: Te
         {isEditing && editable ? (
           <textarea
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => handleContentChange(e.target.value)}
             onBlur={handleBlur}
             autoFocus
             onClick={(e) => e.stopPropagation()}
@@ -61,13 +70,17 @@ export function TextBlock({ component, selected, onSelect, editable = true }: Te
           />
         ) : (
           <p
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              if (editable) setIsEditing(true);
+            }}
             style={{
               fontSize: component.config.fontSize || '16px',
               fontWeight: component.config.fontWeight || 'normal',
               textAlign: component.config.textAlign || 'left',
               color: component.style.color || '#f1f5f9',
             }}
-            className="w-full"
+            className={`w-full ${editable ? 'cursor-text' : ''}`}
           >
             {content}
           </p>
